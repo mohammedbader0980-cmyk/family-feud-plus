@@ -849,6 +849,26 @@ export default function FamilyFeud() {
           </button>
         </div>
 
+        {/* Music controls */}
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <button
+            onClick={toggleMusic}
+            disabled={!tracks.length}
+            title={tracks.length ? tracks[currentTrack]?.name : "أضف أغاني من الإعدادات"}
+            className="px-3 py-2 bg-purple-900/60 rounded border border-purple-700 hover:bg-purple-800 text-white font-bold disabled:opacity-40"
+          >
+            {musicPlaying ? "⏸" : "🎵"}
+          </button>
+          {tracks.length > 1 && (
+            <button
+              onClick={nextTrack}
+              className="px-2 py-2 bg-gray-900 rounded border border-gray-700 text-white text-xs"
+            >
+              ⏭
+            </button>
+          )}
+        </div>
+
         <div className="flex gap-3 items-center flex-shrink-0">
           <div className="flex bg-gray-900 rounded border border-gray-700 overflow-hidden">
             <button
