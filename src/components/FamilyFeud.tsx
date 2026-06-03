@@ -708,11 +708,18 @@ export default function FamilyFeud() {
                 {team1Score}
               </span>
             </div>
-            <div className="team-badge w-16 md:w-28 py-1 flex items-center justify-center">
+            <button
+              onClick={() => {
+                const n = window.prompt("اسم الفريق الأول:", team1Name);
+                if (n && n.trim()) setTeam1Name(n.trim());
+              }}
+              title="انقر لتغيير الاسم"
+              className="team-badge w-16 md:w-28 py-1 flex items-center justify-center cursor-pointer hover:brightness-125"
+            >
               <span className="text-yellow-400 font-bold text-[10px] md:text-sm truncate px-1 text-center w-full">
                 {team1Name}
               </span>
-            </div>
+            </button>
           </div>
 
           {/* Team 2 (left) */}
