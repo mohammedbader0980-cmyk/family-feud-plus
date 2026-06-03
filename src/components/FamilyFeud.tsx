@@ -9,16 +9,8 @@ import {
   type SoundKey,
 } from "@/lib/feud-sounds";
 
-const LS_MUSIC = "harat_music_tracks"; // [{name, url(dataUrl)}]
 type Track = { name: string; url: string };
 
-const fileToDataUrl = (f: File) =>
-  new Promise<string>((res, rej) => {
-    const r = new FileReader();
-    r.onload = () => res(String(r.result));
-    r.onerror = rej;
-    r.readAsDataURL(f);
-  });
 
 type Screen = "start" | "host" | "game";
 type HostTab = "catalog" | "custom";
