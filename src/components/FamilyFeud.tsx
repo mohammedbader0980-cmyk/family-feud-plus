@@ -909,6 +909,16 @@ export default function FamilyFeud() {
           </div>
         </div>
       )}
+
+      {/* Hidden audio element for background music */}
+      {tracks.length > 0 && (
+        <audio
+          ref={musicRef}
+          src={tracks[currentTrack]?.url}
+          onEnded={nextTrack}
+          loop={tracks.length === 1}
+        />
+      )}
     </div>
   );
 }
