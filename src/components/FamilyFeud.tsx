@@ -65,23 +65,27 @@ export default function FamilyFeud() {
     localStorage.setItem(LS_CUSTOM_CATS, JSON.stringify(customCatalogs));
   }, [customCatalogs]);
 
-  // Music
-  const [tracks, setTracks] = useState<Track[]>(() => loadLS<Track[]>(LS_MUSIC, []));
+  // Music (in-memory only — audio files too large for localStorage)
+  const [tracks, setTracks] = useState<Track[]>([]);
   const [currentTrack, setCurrentTrack] = useState(0);
   const [musicPlaying, setMusicPlaying] = useState(false);
   const [musicVolume, setMusicVolume] = useState(0.5);
   const musicRef = useRef<HTMLAudioElement | null>(null);
-  useEffect(() => {
-    try {
-      localStorage.setItem(LS_MUSIC, JSON.stringify(tracks));
-    } catch {
-      alert("الملفات كبيرة جداً للحفظ في المتصفح. جرب ملفات أصغر.");
-    }
-  }, [tracks]);
+
   useEffect(() => {
     if (!musicRef.current) return;
     musicRef.current.volume = musicVolume;
   }, [musicVolume]);
+
+  // When current track changes while playing, auto-play the new one
+  useEffect(() => {
+    if (!musicRef.current || !tracks.length) return;
+    if (musicPlaying) {
+      musicRef.current.play().catch(() => setMusicPlaying(false));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentTrack]);
+
   const toggleMusic = async () => {
     if (!tracks.length || !musicRef.current) return;
     if (musicPlaying) {
@@ -91,8 +95,9 @@ export default function FamilyFeud() {
       try {
         await musicRef.current.play();
         setMusicPlaying(true);
-      } catch {
-        /* ignore */
+      } catch (e) {
+        console.error("music play failed", e);
+        alert("لم يتمكن المتصفح من تشغيل الأغنية. تأكد من نقرك على زر التشغيل.");
       }
     }
   };
@@ -100,24 +105,23 @@ export default function FamilyFeud() {
     if (!tracks.length) return;
     setCurrentTrack((i) => (i + 1) % tracks.length);
   };
-  const addTracks = async (files: FileList) => {
-    const next: Track[] = [];
-    for (const f of Array.from(files)) {
-      try {
-        const url = await fileToDataUrl(f);
-        next.push({ name: f.name, url });
-      } catch {
-        /* ignore */
-      }
-    }
-    setTracks([...tracks, ...next]);
+  const addTracks = (files: FileList) => {
+    const next: Track[] = Array.from(files).map((f) => ({
+      name: f.name,
+      url: URL.createObjectURL(f),
+    }));
+    setTracks((prev) => [...prev, ...next]);
   };
   const removeTrack = (idx: number) => {
-    const t = [...tracks];
-    t.splice(idx, 1);
-    setTracks(t);
-    if (currentTrack >= t.length) setCurrentTrack(0);
+    setTracks((prev) => {
+      const t = [...prev];
+      const [removed] = t.splice(idx, 1);
+      if (removed) URL.revokeObjectURL(removed.url);
+      return t;
+    });
+    if (currentTrack >= tracks.length - 1) setCurrentTrack(0);
   };
+
 
   // Custom SFX (ding/buzzer/win) — bump key to force re-render
   const [sfxVersion, setSfxVersion] = useState(0);
