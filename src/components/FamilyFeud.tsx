@@ -121,9 +121,8 @@ export default function FamilyFeud() {
 
   // Custom SFX (ding/buzzer/win) — bump key to force re-render
   const [sfxVersion, setSfxVersion] = useState(0);
-  const uploadSfx = async (k: SoundKey, file: File) => {
-    const url = await fileToDataUrl(file);
-    setCustomSound(k, url);
+  const uploadSfx = (k: SoundKey, file: File) => {
+    setCustomSound(k, file);
     setSfxVersion((v) => v + 1);
   };
   const clearSfx = (k: SoundKey) => {
