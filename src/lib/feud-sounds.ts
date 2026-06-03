@@ -6,49 +6,46 @@ const getCtx = () => {
   return ctx;
 };
 
-// ===== Custom audio overrides (data URLs from user uploads) =====
+// ===== Custom audio overrides (in-memory object URLs) =====
 export type SoundKey = "ding" | "buzzer" | "win";
-const LS_SOUND = (k: SoundKey) => `harat_sound_${k}`;
+type SfxEntry = { url: string; name: string };
+const sfxStore: Record<SoundKey, SfxEntry | null> = {
+  ding: null,
+  buzzer: null,
+  win: null,
+};
 const cache: Record<SoundKey, HTMLAudioElement | null> = {
   ding: null,
   buzzer: null,
   win: null,
 };
 
-export const getCustomSound = (k: SoundKey): string | null => {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem(LS_SOUND(k));
-};
+export const getCustomSound = (k: SoundKey): SfxEntry | null => sfxStore[k];
 
-export const setCustomSound = (k: SoundKey, dataUrl: string | null) => {
-  if (typeof window === "undefined") return;
-  if (dataUrl) localStorage.setItem(LS_SOUND(k), dataUrl);
-  else localStorage.removeItem(LS_SOUND(k));
+export const setCustomSound = (k: SoundKey, file: File | null) => {
+  // Revoke previous
+  const prev = sfxStore[k];
+  if (prev) URL.revokeObjectURL(prev.url);
   cache[k] = null;
+  if (file) {
+    sfxStore[k] = { url: URL.createObjectURL(file), name: file.name };
+  } else {
+    sfxStore[k] = null;
+  }
 };
 
 const playCustom = (k: SoundKey): boolean => {
-  const url = getCustomSound(k);
-  if (!url) return false;
+  const entry = sfxStore[k];
+  if (!entry) return false;
   try {
-    if (!cache[k]) cache[k] = new Audio(url);
+    if (!cache[k]) cache[k] = new Audio(entry.url);
     const a = cache[k]!;
     a.currentTime = 0;
-    a.play().catch(() => {});
+    void a.play().catch(() => {});
     return true;
   } catch {
     return false;
   }
-};
-
-export const stopAllCustom = () => {
-  (Object.keys(cache) as SoundKey[]).forEach((k) => {
-    const a = cache[k];
-    if (a) {
-      a.pause();
-      a.currentTime = 0;
-    }
-  });
 };
 
 export const playDing = () => {

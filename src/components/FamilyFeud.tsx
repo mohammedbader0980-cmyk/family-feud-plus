@@ -9,16 +9,8 @@ import {
   type SoundKey,
 } from "@/lib/feud-sounds";
 
-const LS_MUSIC = "harat_music_tracks"; // [{name, url(dataUrl)}]
 type Track = { name: string; url: string };
 
-const fileToDataUrl = (f: File) =>
-  new Promise<string>((res, rej) => {
-    const r = new FileReader();
-    r.onload = () => res(String(r.result));
-    r.onerror = rej;
-    r.readAsDataURL(f);
-  });
 
 type Screen = "start" | "host" | "game";
 type HostTab = "catalog" | "custom";
@@ -65,23 +57,27 @@ export default function FamilyFeud() {
     localStorage.setItem(LS_CUSTOM_CATS, JSON.stringify(customCatalogs));
   }, [customCatalogs]);
 
-  // Music
-  const [tracks, setTracks] = useState<Track[]>(() => loadLS<Track[]>(LS_MUSIC, []));
+  // Music (in-memory only — audio files too large for localStorage)
+  const [tracks, setTracks] = useState<Track[]>([]);
   const [currentTrack, setCurrentTrack] = useState(0);
   const [musicPlaying, setMusicPlaying] = useState(false);
   const [musicVolume, setMusicVolume] = useState(0.5);
   const musicRef = useRef<HTMLAudioElement | null>(null);
-  useEffect(() => {
-    try {
-      localStorage.setItem(LS_MUSIC, JSON.stringify(tracks));
-    } catch {
-      alert("الملفات كبيرة جداً للحفظ في المتصفح. جرب ملفات أصغر.");
-    }
-  }, [tracks]);
+
   useEffect(() => {
     if (!musicRef.current) return;
     musicRef.current.volume = musicVolume;
   }, [musicVolume]);
+
+  // When current track changes while playing, auto-play the new one
+  useEffect(() => {
+    if (!musicRef.current || !tracks.length) return;
+    if (musicPlaying) {
+      musicRef.current.play().catch(() => setMusicPlaying(false));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentTrack]);
+
   const toggleMusic = async () => {
     if (!tracks.length || !musicRef.current) return;
     if (musicPlaying) {
@@ -91,8 +87,9 @@ export default function FamilyFeud() {
       try {
         await musicRef.current.play();
         setMusicPlaying(true);
-      } catch {
-        /* ignore */
+      } catch (e) {
+        console.error("music play failed", e);
+        alert("لم يتمكن المتصفح من تشغيل الأغنية. تأكد من نقرك على زر التشغيل.");
       }
     }
   };
@@ -100,30 +97,28 @@ export default function FamilyFeud() {
     if (!tracks.length) return;
     setCurrentTrack((i) => (i + 1) % tracks.length);
   };
-  const addTracks = async (files: FileList) => {
-    const next: Track[] = [];
-    for (const f of Array.from(files)) {
-      try {
-        const url = await fileToDataUrl(f);
-        next.push({ name: f.name, url });
-      } catch {
-        /* ignore */
-      }
-    }
-    setTracks([...tracks, ...next]);
+  const addTracks = (files: FileList) => {
+    const next: Track[] = Array.from(files).map((f) => ({
+      name: f.name,
+      url: URL.createObjectURL(f),
+    }));
+    setTracks((prev) => [...prev, ...next]);
   };
   const removeTrack = (idx: number) => {
-    const t = [...tracks];
-    t.splice(idx, 1);
-    setTracks(t);
-    if (currentTrack >= t.length) setCurrentTrack(0);
+    setTracks((prev) => {
+      const t = [...prev];
+      const [removed] = t.splice(idx, 1);
+      if (removed) URL.revokeObjectURL(removed.url);
+      return t;
+    });
+    if (currentTrack >= tracks.length - 1) setCurrentTrack(0);
   };
+
 
   // Custom SFX (ding/buzzer/win) — bump key to force re-render
   const [sfxVersion, setSfxVersion] = useState(0);
-  const uploadSfx = async (k: SoundKey, file: File) => {
-    const url = await fileToDataUrl(file);
-    setCustomSound(k, url);
+  const uploadSfx = (k: SoundKey, file: File) => {
+    setCustomSound(k, file);
     setSfxVersion((v) => v + 1);
   };
   const clearSfx = (k: SoundKey) => {
@@ -303,10 +298,8 @@ export default function FamilyFeud() {
       <div className="min-h-screen bg-dots-start flex flex-col items-center justify-center p-4" dir="rtl">
         <div className="relative flex flex-col items-center justify-center mb-16 md:scale-125">
           <div className="w-[340px] h-[180px] md:w-[540px] md:h-[270px] bg-gradient-to-b from-[#4774d6] to-[#1d4199] rounded-[100%] border-[4px] md:border-[6px] border-white shadow-[0_0_20px_rgba(0,0,0,0.8),inset_0_0_30px_rgba(0,0,0,0.5)] flex flex-col items-center justify-center relative z-10 outline outline-4 outline-[#dca34b]">
-            <h1 className="logo-text text-[46px] md:text-[80px] leading-[0.95] text-center mt-2 md:mt-4">
-              حارة
-              <br />
-              البطل
+            <h1 className="logo-text text-[44px] md:text-[78px] leading-[1.1] text-center whitespace-nowrap">
+              حارة البطل
             </h1>
             <p
               className="text-[#f2a611] font-black text-sm md:text-xl mt-1 drop-shadow-md"
@@ -690,10 +683,8 @@ export default function FamilyFeud() {
           {/* Top logo + round points */}
           <div className="absolute -top-12 md:-top-16 flex flex-col items-center z-30">
             <div className="w-44 h-24 md:w-64 md:h-28 bg-gradient-to-b from-[#4774d6] to-[#1d4199] rounded-[100%] border-2 md:border-[3px] border-[#dca34b] shadow-xl flex flex-col items-center justify-center">
-              <span className="logo-text text-lg md:text-3xl leading-tight text-center">
-                حارة
-                <br />
-                البطل
+              <span className="logo-text text-xl md:text-3xl leading-tight text-center whitespace-nowrap">
+                حارة البطل
               </span>
             </div>
             <div className="mt-1 bg-gradient-to-b from-[#3a6bdc] to-[#15347a] border-2 border-white rounded-full px-8 md:px-12 py-1 md:py-2 shadow-lg">
