@@ -506,11 +506,11 @@ export default function FamilyFeud() {
         <div className="board-outer bg-dots-board w-full max-w-[1200px] relative pt-16 pb-8 px-4 md:px-16 md:py-16 flex flex-col items-center justify-center z-10 mt-8 md:mt-0">
           {/* Top logo + round points */}
           <div className="absolute -top-12 md:-top-16 flex flex-col items-center z-30">
-            <div className="w-40 h-20 md:w-56 md:h-24 bg-gradient-to-b from-[#4774d6] to-[#1d4199] rounded-[100%] border-2 md:border-[3px] border-[#dca34b] shadow-xl flex flex-col items-center justify-center">
-              <span className="logo-text text-base md:text-2xl leading-tight text-center">
-                FAMILY
+            <div className="w-44 h-24 md:w-64 md:h-28 bg-gradient-to-b from-[#4774d6] to-[#1d4199] rounded-[100%] border-2 md:border-[3px] border-[#dca34b] shadow-xl flex flex-col items-center justify-center">
+              <span className="logo-text text-lg md:text-3xl leading-tight text-center">
+                حارة
                 <br />
-                FEUD
+                البطل
               </span>
             </div>
             <div className="mt-1 bg-gradient-to-b from-[#3a6bdc] to-[#15347a] border-2 border-white rounded-full px-8 md:px-12 py-1 md:py-2 shadow-lg">
