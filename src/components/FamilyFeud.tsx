@@ -683,10 +683,8 @@ export default function FamilyFeud() {
           {/* Top logo + round points */}
           <div className="absolute -top-12 md:-top-16 flex flex-col items-center z-30">
             <div className="w-44 h-24 md:w-64 md:h-28 bg-gradient-to-b from-[#4774d6] to-[#1d4199] rounded-[100%] border-2 md:border-[3px] border-[#dca34b] shadow-xl flex flex-col items-center justify-center">
-              <span className="logo-text text-lg md:text-3xl leading-tight text-center">
-                حارة
-                <br />
-                البطل
+              <span className="logo-text text-xl md:text-3xl leading-tight text-center whitespace-nowrap">
+                حارة البطل
               </span>
             </div>
             <div className="mt-1 bg-gradient-to-b from-[#3a6bdc] to-[#15347a] border-2 border-white rounded-full px-8 md:px-12 py-1 md:py-2 shadow-lg">
