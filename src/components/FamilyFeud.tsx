@@ -1,6 +1,24 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { premadeCatalogs, emptyQuestion, type Question, type Catalog } from "@/data/catalogs";
-import { playDing, playBuzzer, playWin } from "@/lib/feud-sounds";
+import {
+  playDing,
+  playBuzzer,
+  playWin,
+  getCustomSound,
+  setCustomSound,
+  type SoundKey,
+} from "@/lib/feud-sounds";
+
+const LS_MUSIC = "harat_music_tracks"; // [{name, url(dataUrl)}]
+type Track = { name: string; url: string };
+
+const fileToDataUrl = (f: File) =>
+  new Promise<string>((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(String(r.result));
+    r.onerror = rej;
+    r.readAsDataURL(f);
+  });
 
 type Screen = "start" | "host" | "game";
 type HostTab = "catalog" | "custom";
