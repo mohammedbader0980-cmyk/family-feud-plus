@@ -449,6 +449,123 @@ export default function FamilyFeud() {
               </div>
             </div>
 
+            {/* Music library */}
+            <div className="host-card p-4 md:p-6 rounded-xl mb-6 shadow-xl border-t-4 border-[#9b5de5]">
+              <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                <h3 className="text-xl font-bold text-white">🎵 مكتبة الأغاني</h3>
+                <label className="px-4 py-2 bg-[#9b5de5] hover:bg-purple-600 rounded font-bold text-white text-sm cursor-pointer">
+                  + إضافة أغاني
+                  <input
+                    type="file"
+                    accept="audio/*"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => {
+                      if (e.target.files?.length) addTracks(e.target.files);
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+              </div>
+              <p className="text-gray-400 text-xs mb-3">
+                ارفع أغانيك المفضلة، يتم تشغيلها أثناء اللعبة بدل صوت "Family Feud" الافتراضي. (تُحفظ في المتصفح)
+              </p>
+              {tracks.length === 0 ? (
+                <p className="text-gray-500 text-sm italic">لا توجد أغاني بعد.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {tracks.map((t, i) => (
+                    <li
+                      key={i}
+                      className={`flex items-center justify-between gap-2 p-2 rounded border ${
+                        i === currentTrack
+                          ? "border-[#9b5de5] bg-purple-900/30"
+                          : "border-gray-700 bg-gray-900/40"
+                      }`}
+                    >
+                      <button
+                        onClick={() => setCurrentTrack(i)}
+                        className="flex-1 text-right text-white text-sm truncate"
+                      >
+                        {i === currentTrack ? "▶ " : ""}
+                        {t.name}
+                      </button>
+                      <button
+                        onClick={() => removeTrack(i)}
+                        className="text-red-400 hover:text-white text-xs bg-red-900/40 hover:bg-red-700 px-2 py-1 rounded"
+                      >
+                        حذف
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            {/* SFX overrides */}
+            <div className="host-card p-4 md:p-6 rounded-xl mb-6 shadow-xl border-t-4 border-[#ff9900]">
+              <h3 className="text-xl font-bold text-white mb-3">🔔 المؤثرات الصوتية</h3>
+              <p className="text-gray-400 text-xs mb-4">
+                استبدل أصوات اللعبة (الإجابة الصحيحة، الخطأ، الفوز) بأصواتك الخاصة.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3" key={sfxVersion}>
+                {(
+                  [
+                    { k: "ding" as SoundKey, label: "صح ✅" },
+                    { k: "buzzer" as SoundKey, label: "خطأ ❌" },
+                    { k: "win" as SoundKey, label: "فوز 🏆" },
+                  ]
+                ).map(({ k, label }) => {
+                  const has = !!getCustomSound(k);
+                  return (
+                    <div key={k} className="bg-gray-900/40 border border-gray-700 rounded p-3">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-white font-bold text-sm">{label}</span>
+                        <span
+                          className={`text-[10px] px-2 py-0.5 rounded ${
+                            has ? "bg-green-700 text-white" : "bg-gray-700 text-gray-300"
+                          }`}
+                        >
+                          {has ? "مخصص" : "افتراضي"}
+                        </span>
+                      </div>
+                      <div className="flex gap-2">
+                        <label className="flex-1 text-center px-2 py-1.5 bg-[#1d3d8f] hover:bg-blue-600 rounded font-bold text-white text-xs cursor-pointer">
+                          ⬆️ رفع
+                          <input
+                            type="file"
+                            accept="audio/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const f = e.target.files?.[0];
+                              if (f) uploadSfx(k, f);
+                              e.target.value = "";
+                            }}
+                          />
+                        </label>
+                        <button
+                          onClick={() => k === "ding" ? playDing() : k === "buzzer" ? playBuzzer() : playWin()}
+                          className="px-2 py-1.5 bg-gray-700 hover:bg-gray-600 rounded text-white text-xs"
+                        >
+                          ▶
+                        </button>
+                        {has && (
+                          <button
+                            onClick={() => clearSfx(k)}
+                            className="px-2 py-1.5 bg-red-900/60 hover:bg-red-700 rounded text-white text-xs"
+                          >
+                            ✖
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+
+
             <div className="host-card p-4 rounded-xl mb-6 flex flex-wrap gap-2">
               <button
                 onClick={saveAsCustomCatalog}
