@@ -1,6 +1,24 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { premadeCatalogs, emptyQuestion, type Question, type Catalog } from "@/data/catalogs";
-import { playDing, playBuzzer, playWin } from "@/lib/feud-sounds";
+import {
+  playDing,
+  playBuzzer,
+  playWin,
+  getCustomSound,
+  setCustomSound,
+  type SoundKey,
+} from "@/lib/feud-sounds";
+
+const LS_MUSIC = "harat_music_tracks"; // [{name, url(dataUrl)}]
+type Track = { name: string; url: string };
+
+const fileToDataUrl = (f: File) =>
+  new Promise<string>((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(String(r.result));
+    r.onerror = rej;
+    r.readAsDataURL(f);
+  });
 
 type Screen = "start" | "host" | "game";
 type HostTab = "catalog" | "custom";
@@ -46,6 +64,72 @@ export default function FamilyFeud() {
   useEffect(() => {
     localStorage.setItem(LS_CUSTOM_CATS, JSON.stringify(customCatalogs));
   }, [customCatalogs]);
+
+  // Music
+  const [tracks, setTracks] = useState<Track[]>(() => loadLS<Track[]>(LS_MUSIC, []));
+  const [currentTrack, setCurrentTrack] = useState(0);
+  const [musicPlaying, setMusicPlaying] = useState(false);
+  const [musicVolume, setMusicVolume] = useState(0.5);
+  const musicRef = useRef<HTMLAudioElement | null>(null);
+  useEffect(() => {
+    try {
+      localStorage.setItem(LS_MUSIC, JSON.stringify(tracks));
+    } catch {
+      alert("الملفات كبيرة جداً للحفظ في المتصفح. جرب ملفات أصغر.");
+    }
+  }, [tracks]);
+  useEffect(() => {
+    if (!musicRef.current) return;
+    musicRef.current.volume = musicVolume;
+  }, [musicVolume]);
+  const toggleMusic = async () => {
+    if (!tracks.length || !musicRef.current) return;
+    if (musicPlaying) {
+      musicRef.current.pause();
+      setMusicPlaying(false);
+    } else {
+      try {
+        await musicRef.current.play();
+        setMusicPlaying(true);
+      } catch {
+        /* ignore */
+      }
+    }
+  };
+  const nextTrack = () => {
+    if (!tracks.length) return;
+    setCurrentTrack((i) => (i + 1) % tracks.length);
+  };
+  const addTracks = async (files: FileList) => {
+    const next: Track[] = [];
+    for (const f of Array.from(files)) {
+      try {
+        const url = await fileToDataUrl(f);
+        next.push({ name: f.name, url });
+      } catch {
+        /* ignore */
+      }
+    }
+    setTracks([...tracks, ...next]);
+  };
+  const removeTrack = (idx: number) => {
+    const t = [...tracks];
+    t.splice(idx, 1);
+    setTracks(t);
+    if (currentTrack >= t.length) setCurrentTrack(0);
+  };
+
+  // Custom SFX (ding/buzzer/win) — bump key to force re-render
+  const [sfxVersion, setSfxVersion] = useState(0);
+  const uploadSfx = async (k: SoundKey, file: File) => {
+    const url = await fileToDataUrl(file);
+    setCustomSound(k, url);
+    setSfxVersion((v) => v + 1);
+  };
+  const clearSfx = (k: SoundKey) => {
+    setCustomSound(k, null);
+    setSfxVersion((v) => v + 1);
+  };
 
   // Game state
   const [currentQIndex, setCurrentQIndex] = useState(0);
@@ -218,17 +302,17 @@ export default function FamilyFeud() {
     return (
       <div className="min-h-screen bg-dots-start flex flex-col items-center justify-center p-4" dir="rtl">
         <div className="relative flex flex-col items-center justify-center mb-16 md:scale-125">
-          <div className="w-[320px] h-[160px] md:w-[500px] md:h-[250px] bg-gradient-to-b from-[#4774d6] to-[#1d4199] rounded-[100%] border-[4px] md:border-[6px] border-white shadow-[0_0_20px_rgba(0,0,0,0.8),inset_0_0_30px_rgba(0,0,0,0.5)] flex flex-col items-center justify-center relative z-10 outline outline-4 outline-[#dca34b]">
-            <h1 className="logo-text text-[50px] md:text-[75px] leading-[0.9] text-center mt-2 md:mt-4">
-              FAMILY
+          <div className="w-[340px] h-[180px] md:w-[540px] md:h-[270px] bg-gradient-to-b from-[#4774d6] to-[#1d4199] rounded-[100%] border-[4px] md:border-[6px] border-white shadow-[0_0_20px_rgba(0,0,0,0.8),inset_0_0_30px_rgba(0,0,0,0.5)] flex flex-col items-center justify-center relative z-10 outline outline-4 outline-[#dca34b]">
+            <h1 className="logo-text text-[46px] md:text-[80px] leading-[0.95] text-center mt-2 md:mt-4">
+              حارة
               <br />
-              FEUD
+              البطل
             </h1>
             <p
               className="text-[#f2a611] font-black text-sm md:text-xl mt-1 drop-shadow-md"
               style={{ WebkitTextStroke: "1px #592d00" }}
             >
-              صراع العائلات
+              لعبة العائلات التفاعلية
             </p>
           </div>
         </div>
@@ -365,6 +449,123 @@ export default function FamilyFeud() {
               </div>
             </div>
 
+            {/* Music library */}
+            <div className="host-card p-4 md:p-6 rounded-xl mb-6 shadow-xl border-t-4 border-[#9b5de5]">
+              <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                <h3 className="text-xl font-bold text-white">🎵 مكتبة الأغاني</h3>
+                <label className="px-4 py-2 bg-[#9b5de5] hover:bg-purple-600 rounded font-bold text-white text-sm cursor-pointer">
+                  + إضافة أغاني
+                  <input
+                    type="file"
+                    accept="audio/*"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => {
+                      if (e.target.files?.length) addTracks(e.target.files);
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+              </div>
+              <p className="text-gray-400 text-xs mb-3">
+                ارفع أغانيك المفضلة، يتم تشغيلها أثناء اللعبة بدل صوت "Family Feud" الافتراضي. (تُحفظ في المتصفح)
+              </p>
+              {tracks.length === 0 ? (
+                <p className="text-gray-500 text-sm italic">لا توجد أغاني بعد.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {tracks.map((t, i) => (
+                    <li
+                      key={i}
+                      className={`flex items-center justify-between gap-2 p-2 rounded border ${
+                        i === currentTrack
+                          ? "border-[#9b5de5] bg-purple-900/30"
+                          : "border-gray-700 bg-gray-900/40"
+                      }`}
+                    >
+                      <button
+                        onClick={() => setCurrentTrack(i)}
+                        className="flex-1 text-right text-white text-sm truncate"
+                      >
+                        {i === currentTrack ? "▶ " : ""}
+                        {t.name}
+                      </button>
+                      <button
+                        onClick={() => removeTrack(i)}
+                        className="text-red-400 hover:text-white text-xs bg-red-900/40 hover:bg-red-700 px-2 py-1 rounded"
+                      >
+                        حذف
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            {/* SFX overrides */}
+            <div className="host-card p-4 md:p-6 rounded-xl mb-6 shadow-xl border-t-4 border-[#ff9900]">
+              <h3 className="text-xl font-bold text-white mb-3">🔔 المؤثرات الصوتية</h3>
+              <p className="text-gray-400 text-xs mb-4">
+                استبدل أصوات اللعبة (الإجابة الصحيحة، الخطأ، الفوز) بأصواتك الخاصة.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3" key={sfxVersion}>
+                {(
+                  [
+                    { k: "ding" as SoundKey, label: "صح ✅" },
+                    { k: "buzzer" as SoundKey, label: "خطأ ❌" },
+                    { k: "win" as SoundKey, label: "فوز 🏆" },
+                  ]
+                ).map(({ k, label }) => {
+                  const has = !!getCustomSound(k);
+                  return (
+                    <div key={k} className="bg-gray-900/40 border border-gray-700 rounded p-3">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-white font-bold text-sm">{label}</span>
+                        <span
+                          className={`text-[10px] px-2 py-0.5 rounded ${
+                            has ? "bg-green-700 text-white" : "bg-gray-700 text-gray-300"
+                          }`}
+                        >
+                          {has ? "مخصص" : "افتراضي"}
+                        </span>
+                      </div>
+                      <div className="flex gap-2">
+                        <label className="flex-1 text-center px-2 py-1.5 bg-[#1d3d8f] hover:bg-blue-600 rounded font-bold text-white text-xs cursor-pointer">
+                          ⬆️ رفع
+                          <input
+                            type="file"
+                            accept="audio/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const f = e.target.files?.[0];
+                              if (f) uploadSfx(k, f);
+                              e.target.value = "";
+                            }}
+                          />
+                        </label>
+                        <button
+                          onClick={() => k === "ding" ? playDing() : k === "buzzer" ? playBuzzer() : playWin()}
+                          className="px-2 py-1.5 bg-gray-700 hover:bg-gray-600 rounded text-white text-xs"
+                        >
+                          ▶
+                        </button>
+                        {has && (
+                          <button
+                            onClick={() => clearSfx(k)}
+                            className="px-2 py-1.5 bg-red-900/60 hover:bg-red-700 rounded text-white text-xs"
+                          >
+                            ✖
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+
+
             <div className="host-card p-4 rounded-xl mb-6 flex flex-wrap gap-2">
               <button
                 onClick={saveAsCustomCatalog}
@@ -488,11 +689,11 @@ export default function FamilyFeud() {
         <div className="board-outer bg-dots-board w-full max-w-[1200px] relative pt-16 pb-8 px-4 md:px-16 md:py-16 flex flex-col items-center justify-center z-10 mt-8 md:mt-0">
           {/* Top logo + round points */}
           <div className="absolute -top-12 md:-top-16 flex flex-col items-center z-30">
-            <div className="w-40 h-20 md:w-56 md:h-24 bg-gradient-to-b from-[#4774d6] to-[#1d4199] rounded-[100%] border-2 md:border-[3px] border-[#dca34b] shadow-xl flex flex-col items-center justify-center">
-              <span className="logo-text text-base md:text-2xl leading-tight text-center">
-                FAMILY
+            <div className="w-44 h-24 md:w-64 md:h-28 bg-gradient-to-b from-[#4774d6] to-[#1d4199] rounded-[100%] border-2 md:border-[3px] border-[#dca34b] shadow-xl flex flex-col items-center justify-center">
+              <span className="logo-text text-lg md:text-3xl leading-tight text-center">
+                حارة
                 <br />
-                FEUD
+                البطل
               </span>
             </div>
             <div className="mt-1 bg-gradient-to-b from-[#3a6bdc] to-[#15347a] border-2 border-white rounded-full px-8 md:px-12 py-1 md:py-2 shadow-lg">
@@ -507,11 +708,18 @@ export default function FamilyFeud() {
                 {team1Score}
               </span>
             </div>
-            <div className="team-badge w-16 md:w-28 py-1 flex items-center justify-center">
+            <button
+              onClick={() => {
+                const n = window.prompt("اسم الفريق الأول:", team1Name);
+                if (n && n.trim()) setTeam1Name(n.trim());
+              }}
+              title="انقر لتغيير الاسم"
+              className="team-badge w-16 md:w-28 py-1 flex items-center justify-center cursor-pointer hover:brightness-125"
+            >
               <span className="text-yellow-400 font-bold text-[10px] md:text-sm truncate px-1 text-center w-full">
                 {team1Name}
               </span>
-            </div>
+            </button>
           </div>
 
           {/* Team 2 (left) */}
@@ -521,11 +729,18 @@ export default function FamilyFeud() {
                 {team2Score}
               </span>
             </div>
-            <div className="team-badge w-16 md:w-28 py-1 flex items-center justify-center">
+            <button
+              onClick={() => {
+                const n = window.prompt("اسم الفريق الثاني:", team2Name);
+                if (n && n.trim()) setTeam2Name(n.trim());
+              }}
+              title="انقر لتغيير الاسم"
+              className="team-badge w-16 md:w-28 py-1 flex items-center justify-center cursor-pointer hover:brightness-125"
+            >
               <span className="text-yellow-400 font-bold text-[10px] md:text-sm truncate px-1 text-center w-full">
                 {team2Name}
               </span>
-            </div>
+            </button>
           </div>
 
           {/* Board */}
@@ -648,6 +863,26 @@ export default function FamilyFeud() {
           </button>
         </div>
 
+        {/* Music controls */}
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <button
+            onClick={toggleMusic}
+            disabled={!tracks.length}
+            title={tracks.length ? tracks[currentTrack]?.name : "أضف أغاني من الإعدادات"}
+            className="px-3 py-2 bg-purple-900/60 rounded border border-purple-700 hover:bg-purple-800 text-white font-bold disabled:opacity-40"
+          >
+            {musicPlaying ? "⏸" : "🎵"}
+          </button>
+          {tracks.length > 1 && (
+            <button
+              onClick={nextTrack}
+              className="px-2 py-2 bg-gray-900 rounded border border-gray-700 text-white text-xs"
+            >
+              ⏭
+            </button>
+          )}
+        </div>
+
         <div className="flex gap-3 items-center flex-shrink-0">
           <div className="flex bg-gray-900 rounded border border-gray-700 overflow-hidden">
             <button
@@ -687,6 +922,16 @@ export default function FamilyFeud() {
             ))}
           </div>
         </div>
+      )}
+
+      {/* Hidden audio element for background music */}
+      {tracks.length > 0 && (
+        <audio
+          ref={musicRef}
+          src={tracks[currentTrack]?.url}
+          onEnded={nextTrack}
+          loop={tracks.length === 1}
+        />
       )}
     </div>
   );
