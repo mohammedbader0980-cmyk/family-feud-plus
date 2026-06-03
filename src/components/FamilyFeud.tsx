@@ -65,6 +65,72 @@ export default function FamilyFeud() {
     localStorage.setItem(LS_CUSTOM_CATS, JSON.stringify(customCatalogs));
   }, [customCatalogs]);
 
+  // Music
+  const [tracks, setTracks] = useState<Track[]>(() => loadLS<Track[]>(LS_MUSIC, []));
+  const [currentTrack, setCurrentTrack] = useState(0);
+  const [musicPlaying, setMusicPlaying] = useState(false);
+  const [musicVolume, setMusicVolume] = useState(0.5);
+  const musicRef = useRef<HTMLAudioElement | null>(null);
+  useEffect(() => {
+    try {
+      localStorage.setItem(LS_MUSIC, JSON.stringify(tracks));
+    } catch {
+      alert("الملفات كبيرة جداً للحفظ في المتصفح. جرب ملفات أصغر.");
+    }
+  }, [tracks]);
+  useEffect(() => {
+    if (!musicRef.current) return;
+    musicRef.current.volume = musicVolume;
+  }, [musicVolume]);
+  const toggleMusic = async () => {
+    if (!tracks.length || !musicRef.current) return;
+    if (musicPlaying) {
+      musicRef.current.pause();
+      setMusicPlaying(false);
+    } else {
+      try {
+        await musicRef.current.play();
+        setMusicPlaying(true);
+      } catch {
+        /* ignore */
+      }
+    }
+  };
+  const nextTrack = () => {
+    if (!tracks.length) return;
+    setCurrentTrack((i) => (i + 1) % tracks.length);
+  };
+  const addTracks = async (files: FileList) => {
+    const next: Track[] = [];
+    for (const f of Array.from(files)) {
+      try {
+        const url = await fileToDataUrl(f);
+        next.push({ name: f.name, url });
+      } catch {
+        /* ignore */
+      }
+    }
+    setTracks([...tracks, ...next]);
+  };
+  const removeTrack = (idx: number) => {
+    const t = [...tracks];
+    t.splice(idx, 1);
+    setTracks(t);
+    if (currentTrack >= t.length) setCurrentTrack(0);
+  };
+
+  // Custom SFX (ding/buzzer/win) — bump key to force re-render
+  const [sfxVersion, setSfxVersion] = useState(0);
+  const uploadSfx = async (k: SoundKey, file: File) => {
+    const url = await fileToDataUrl(file);
+    setCustomSound(k, url);
+    setSfxVersion((v) => v + 1);
+  };
+  const clearSfx = (k: SoundKey) => {
+    setCustomSound(k, null);
+    setSfxVersion((v) => v + 1);
+  };
+
   // Game state
   const [currentQIndex, setCurrentQIndex] = useState(0);
   const [revealed, setRevealed] = useState<boolean[]>(Array(8).fill(false));
