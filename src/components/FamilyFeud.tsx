@@ -40,27 +40,37 @@ export default function FamilyFeud() {
   const [hostTab, setHostTab] = useState<HostTab>("catalog");
   const [confirmCat, setConfirmCat] = useState<Catalog | null>(null);
 
-  const [questions, setQuestions] = useState<Question[]>(() =>
-    loadLS<Question[]>(LS_QUESTIONS, premadeCatalogs[0].questions)
-  );
-  const [team1Name, setTeam1Name] = useState<string>(() => loadLS<string>(LS_TEAM1, "فريق 1"));
-  const [team2Name, setTeam2Name] = useState<string>(() => loadLS<string>(LS_TEAM2, "فريق 2"));
-  const [customCatalogs, setCustomCatalogs] = useState<Catalog[]>(() =>
-    loadLS<Catalog[]>(LS_CUSTOM_CATS, [])
-  );
+  const [questions, setQuestions] = useState<Question[]>(premadeCatalogs[0].questions);
+  const [team1Name, setTeam1Name] = useState<string>("فريق 1");
+  const [team2Name, setTeam2Name] = useState<string>("فريق 2");
+  const [customCatalogs, setCustomCatalogs] = useState<Catalog[]>([]);
+  const [hydrated, setHydrated] = useState(false);
+
+  // Load persisted state from localStorage AFTER mount (avoid SSR overwriting)
+  useEffect(() => {
+    setQuestions(loadLS<Question[]>(LS_QUESTIONS, premadeCatalogs[0].questions));
+    setTeam1Name(loadLS<string>(LS_TEAM1, "فريق 1"));
+    setTeam2Name(loadLS<string>(LS_TEAM2, "فريق 2"));
+    setCustomCatalogs(loadLS<Catalog[]>(LS_CUSTOM_CATS, []));
+    setHydrated(true);
+  }, []);
 
   useEffect(() => {
+    if (!hydrated) return;
     localStorage.setItem(LS_QUESTIONS, JSON.stringify(questions));
-  }, [questions]);
+  }, [questions, hydrated]);
   useEffect(() => {
+    if (!hydrated) return;
     localStorage.setItem(LS_TEAM1, JSON.stringify(team1Name));
-  }, [team1Name]);
+  }, [team1Name, hydrated]);
   useEffect(() => {
+    if (!hydrated) return;
     localStorage.setItem(LS_TEAM2, JSON.stringify(team2Name));
-  }, [team2Name]);
+  }, [team2Name, hydrated]);
   useEffect(() => {
+    if (!hydrated) return;
     localStorage.setItem(LS_CUSTOM_CATS, JSON.stringify(customCatalogs));
-  }, [customCatalogs]);
+  }, [customCatalogs, hydrated]);
 
   // Music (in-memory only — audio files too large for localStorage)
   const [tracks, setTracks] = useState<Track[]>([]);
