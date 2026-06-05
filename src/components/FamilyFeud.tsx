@@ -8,8 +8,13 @@ import {
   setCustomSound,
   type SoundKey,
 } from "@/lib/feud-sounds";
+import {
+  idbAddTrack,
+  idbDeleteTrack,
+  idbGetAllTracks,
+} from "@/lib/music-db";
 
-type Track = { name: string; url: string };
+type Track = { id: string; name: string; url: string };
 
 
 type Screen = "start" | "host" | "game";
@@ -97,20 +102,47 @@ export default function FamilyFeud() {
     if (!tracks.length) return;
     setCurrentTrack((i) => (i + 1) % tracks.length);
   };
-  const addTracks = (files: FileList) => {
-    const next: Track[] = Array.from(files).map((f) => ({
-      name: f.name,
-      url: URL.createObjectURL(f),
-    }));
-    setTracks((prev) => [...prev, ...next]);
+  // Load persisted tracks from IndexedDB on mount
+  useEffect(() => {
+    let revoked: string[] = [];
+    (async () => {
+      const stored = await idbGetAllTracks();
+      const mapped: Track[] = stored.map((s) => ({
+        id: s.id,
+        name: s.name,
+        url: URL.createObjectURL(s.blob),
+      }));
+      revoked = mapped.map((m) => m.url);
+      setTracks(mapped);
+    })();
+    return () => {
+      revoked.forEach((u) => URL.revokeObjectURL(u));
+    };
+  }, []);
+
+  const addTracks = async (files: FileList) => {
+    const added: Track[] = [];
+    for (const f of Array.from(files)) {
+      try {
+        const saved = await idbAddTrack(f);
+        added.push({ id: saved.id, name: saved.name, url: URL.createObjectURL(saved.blob) });
+      } catch (e) {
+        console.error("Failed to save track", e);
+        alert(`تعذّر حفظ الملف: ${f.name}`);
+      }
+    }
+    if (added.length) setTracks((prev) => [...prev, ...added]);
   };
-  const removeTrack = (idx: number) => {
-    setTracks((prev) => {
-      const t = [...prev];
-      const [removed] = t.splice(idx, 1);
-      if (removed) URL.revokeObjectURL(removed.url);
-      return t;
-    });
+  const removeTrack = async (idx: number) => {
+    const target = tracks[idx];
+    if (!target) return;
+    try {
+      await idbDeleteTrack(target.id);
+    } catch (e) {
+      console.error("Failed to delete track", e);
+    }
+    URL.revokeObjectURL(target.url);
+    setTracks((prev) => prev.filter((_, i) => i !== idx));
     if (currentTrack >= tracks.length - 1) setCurrentTrack(0);
   };
 
