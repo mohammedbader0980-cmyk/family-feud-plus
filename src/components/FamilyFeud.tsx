@@ -13,6 +13,7 @@ import {
   idbDeleteTrack,
   idbGetAllTracks,
 } from "@/lib/music-db";
+import { sendMessage, subscribe, type SyncMessage } from "@/lib/feud-sync";
 
 type Track = { id: string; name: string; url: string };
 
