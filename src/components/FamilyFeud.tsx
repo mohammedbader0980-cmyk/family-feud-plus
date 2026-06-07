@@ -1124,6 +1124,72 @@ export default function FamilyFeud() {
           loop={tracks.length === 1}
         />
       )}
+
+      {/* Floating mobile controller QR button */}
+      <button
+        onClick={() => setShowQR(true)}
+        className="fixed bottom-20 left-4 md:bottom-6 md:left-6 z-40 bg-purple-700 hover:bg-purple-600 text-white font-bold px-4 py-3 rounded-full shadow-2xl border-2 border-purple-400 text-sm"
+        title="فتح وحدة تحكم الجوال"
+      >
+        📱 تحكم
+      </button>
+
+      {showQR && <QRModal onClose={() => setShowQR(false)} />}
+    </div>
+  );
+}
+
+function QRModal({ onClose }: { onClose: () => void }) {
+  const url = typeof window !== "undefined" ? `${window.location.origin}/controller` : "/controller";
+  const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(url)}`;
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* ignore */
+    }
+  };
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4"
+      onClick={onClose}
+      dir="rtl"
+    >
+      <div
+        className="bg-card border border-border rounded-2xl p-6 max-w-sm w-full shadow-2xl text-center"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 className="text-xl font-bold mb-2 text-white">وحدة تحكم الجوال</h3>
+        <p className="text-xs text-gray-400 mb-4">
+          امسح الرمز أو افتح الرابط في نفس المتصفح/الجهاز
+        </p>
+        <div className="bg-white p-3 rounded-xl inline-block mb-4">
+          <img src={qrSrc} alt="QR" width={220} height={220} />
+        </div>
+        <div className="flex gap-2 mb-3">
+          <input
+            readOnly
+            value={url}
+            onFocus={(e) => e.currentTarget.select()}
+            className="flex-1 bg-gray-900 border border-gray-700 text-white text-xs p-2 rounded font-mono"
+          />
+          <button
+            onClick={copy}
+            className="px-3 py-2 bg-blue-700 hover:bg-blue-600 text-white rounded text-xs font-bold"
+          >
+            {copied ? "تم" : "نسخ"}
+          </button>
+        </div>
+        <button
+          onClick={onClose}
+          className="w-full py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-bold"
+        >
+          إغلاق
+        </button>
+      </div>
     </div>
   );
 }
