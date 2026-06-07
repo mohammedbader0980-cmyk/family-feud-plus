@@ -1,6 +1,8 @@
-// Lightweight BroadcastChannel sync between the main game screen and the
-// mobile controller route. Works only across tabs in the same browser
-// profile on the same device (BroadcastChannel limitation).
+// Cross-device sync via Supabase Realtime broadcast.
+// Channel "feud-room" - public access, no auth required.
+
+import { supabase } from "@/integrations/supabase/client";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 
 export type ControllerAction =
   | { action: "REVEAL_ANSWER"; payload: { index: number } }
@@ -40,25 +42,72 @@ export type DisplayState = {
 
 export type SyncMessage = ControllerAction | DisplayState;
 
-const CHANNEL = "family-feud-sync";
+const ROOM = "feud-room";
+const EVENT = "sync";
 
-const getChannel = (): BroadcastChannel | null => {
-  if (typeof window === "undefined" || typeof BroadcastChannel === "undefined") return null;
-  return new BroadcastChannel(CHANNEL);
+// A unique id per tab/device, so we can ignore echoes of our own messages.
+const SENDER_ID =
+  typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : Math.random().toString(36).slice(2);
+
+type Listener = (msg: SyncMessage) => void;
+
+let channel: RealtimeChannel | null = null;
+let channelReady = false;
+const pendingSends: SyncMessage[] = [];
+const listeners = new Set<Listener>();
+
+const ensureChannel = (): RealtimeChannel | null => {
+  if (typeof window === "undefined") return null;
+  if (channel) return channel;
+
+  channel = supabase.channel(ROOM, {
+    config: { broadcast: { self: false, ack: false } },
+  });
+
+  channel.on("broadcast", { event: EVENT }, (msg) => {
+    const data = msg.payload as { sender: string; body: SyncMessage } | undefined;
+    if (!data || data.sender === SENDER_ID) return;
+    listeners.forEach((l) => {
+      try {
+        l(data.body);
+      } catch (e) {
+        console.error("[feud-sync] listener error", e);
+      }
+    });
+  });
+
+  channel.subscribe((status) => {
+    if (status === "SUBSCRIBED") {
+      channelReady = true;
+      const queued = pendingSends.splice(0);
+      queued.forEach((m) => sendMessage(m));
+    }
+  });
+
+  return channel;
 };
 
 export const sendMessage = (msg: SyncMessage) => {
-  const ch = getChannel();
+  const ch = ensureChannel();
   if (!ch) return;
-  ch.postMessage(msg);
-  ch.close();
+  if (!channelReady) {
+    pendingSends.push(msg);
+    return;
+  }
+  ch.send({
+    type: "broadcast",
+    event: EVENT,
+    payload: { sender: SENDER_ID, body: msg },
+  }).catch((e) => console.error("[feud-sync] send failed", e));
 };
 
-export const subscribe = (handler: (msg: SyncMessage) => void): (() => void) => {
-  if (typeof window === "undefined" || typeof BroadcastChannel === "undefined") {
-    return () => {};
-  }
-  const ch = new BroadcastChannel(CHANNEL);
-  ch.onmessage = (e) => handler(e.data as SyncMessage);
-  return () => ch.close();
+export const subscribe = (handler: Listener): (() => void) => {
+  if (typeof window === "undefined") return () => {};
+  ensureChannel();
+  listeners.add(handler);
+  return () => {
+    listeners.delete(handler);
+  };
 };
