@@ -270,6 +270,163 @@ export default function FamilyFeud() {
     setScreen("game");
   };
 
+  // ============ Mobile controller sync (BroadcastChannel) ============
+  const [showQR, setShowQR] = useState(false);
+
+  // Keep latest handlers in a ref so the subscription stays stable.
+  const handlersRef = useRef({
+    reveal,
+    revealAll,
+    strike,
+    award,
+    resetRound,
+    nextQ,
+    prevQ,
+    toggleMusic,
+    setTimerRunning,
+    setShowQuestion,
+    setScreen,
+    setTeam1Score,
+    setTeam2Score,
+    currentQ,
+    timerRunning,
+    showQuestion,
+  });
+  useEffect(() => {
+    handlersRef.current = {
+      reveal,
+      revealAll,
+      strike,
+      award,
+      resetRound,
+      nextQ,
+      prevQ,
+      toggleMusic,
+      setTimerRunning,
+      setShowQuestion,
+      setScreen,
+      setTeam1Score,
+      setTeam2Score,
+      currentQ,
+      timerRunning,
+      showQuestion,
+    };
+  });
+
+  // Broadcast state snapshot whenever something the controller shows changes
+  useEffect(() => {
+    const answers = currentQ.answers || [];
+    sendMessage({
+      action: "STATE",
+      payload: {
+        currentQIndex,
+        totalQuestions: questions.length,
+        questionText: currentQ.question || "",
+        questionHidden: !showQuestion,
+        team1Name,
+        team2Name,
+        team1Score,
+        team2Score,
+        revealed,
+        answerHasText: Array.from({ length: 8 }, (_, i) => !!answers[i]?.text?.trim()),
+        timerSec,
+        timerRunning,
+        musicPlaying,
+        hasMusic: tracks.length > 0,
+        onGameScreen: screen === "game",
+      },
+    });
+  }, [
+    currentQIndex,
+    questions.length,
+    currentQ,
+    showQuestion,
+    team1Name,
+    team2Name,
+    team1Score,
+    team2Score,
+    revealed,
+    timerSec,
+    timerRunning,
+    musicPlaying,
+    tracks.length,
+    screen,
+  ]);
+
+  // Subscribe to controller actions
+  useEffect(() => {
+    const off = subscribe((msg: SyncMessage) => {
+      const h = handlersRef.current;
+      switch (msg.action) {
+        case "REQUEST_STATE": {
+          const answers = h.currentQ.answers || [];
+          sendMessage({
+            action: "STATE",
+            payload: {
+              currentQIndex,
+              totalQuestions: questions.length,
+              questionText: h.currentQ.question || "",
+              questionHidden: !h.showQuestion,
+              team1Name,
+              team2Name,
+              team1Score,
+              team2Score,
+              revealed,
+              answerHasText: Array.from({ length: 8 }, (_, i) => !!answers[i]?.text?.trim()),
+              timerSec,
+              timerRunning,
+              musicPlaying,
+              hasMusic: tracks.length > 0,
+              onGameScreen: screen === "game",
+            },
+          });
+          break;
+        }
+        case "REVEAL_ANSWER":
+          h.reveal(msg.payload.index);
+          break;
+        case "REVEAL_ALL":
+          h.revealAll();
+          break;
+        case "HIDE_QUESTION":
+          h.setShowQuestion(!h.showQuestion);
+          break;
+        case "NEXT_QUESTION":
+          h.nextQ();
+          break;
+        case "PREV_QUESTION":
+          h.prevQ();
+          break;
+        case "ADD_X":
+          h.strike(msg.payload.count);
+          break;
+        case "WIN_TEAM":
+          h.award(msg.payload.team);
+          break;
+        case "TOGGLE_MUSIC":
+          void h.toggleMusic();
+          break;
+        case "START_TIMER":
+          h.setTimerRunning(!h.timerRunning);
+          break;
+        case "RESET_QUESTION":
+          h.resetRound();
+          break;
+        case "UPDATE_SCORE":
+          if (msg.payload.team === 1) h.setTeam1Score((s) => s + msg.payload.delta);
+          else h.setTeam2Score((s) => s + msg.payload.delta);
+          break;
+        case "GO_HOME":
+          h.setScreen("start");
+          break;
+      }
+    });
+    return off;
+    // We want one stable subscription for the lifetime of the component
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+
   // Host actions
   const updateQuestionText = (qi: number, v: string) => {
     const q = [...questions];
