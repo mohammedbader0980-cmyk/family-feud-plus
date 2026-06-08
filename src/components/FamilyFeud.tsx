@@ -272,6 +272,7 @@ export default function FamilyFeud() {
 
   // ============ Mobile controller sync (BroadcastChannel) ============
   const [showQR, setShowQR] = useState(false);
+  const [displayMode, setDisplayMode] = useState(false);
 
   // Keep latest handlers in a ref so the subscription stays stable.
   const handlersRef = useRef({
