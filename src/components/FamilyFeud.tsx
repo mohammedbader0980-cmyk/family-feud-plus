@@ -1147,13 +1147,15 @@ export default function FamilyFeud() {
       )}
 
       {/* Floating mobile controller QR button */}
-      <button
-        onClick={() => setShowQR(true)}
-        className="fixed bottom-20 left-4 md:bottom-6 md:left-6 z-40 bg-purple-700 hover:bg-purple-600 text-white font-bold px-4 py-3 rounded-full shadow-2xl border-2 border-purple-400 text-sm"
-        title="فتح وحدة تحكم الجوال"
-      >
-        📱 تحكم
-      </button>
+      {!displayMode && (
+        <button
+          onClick={() => setShowQR(true)}
+          className="fixed bottom-16 left-3 md:bottom-4 md:left-4 z-40 bg-purple-700/60 hover:bg-purple-600 backdrop-blur-sm text-white/90 hover:text-white font-bold w-11 h-11 rounded-full shadow-lg border border-purple-300/40 text-lg flex items-center justify-center"
+          title="فتح وحدة تحكم الجوال (مسح QR)"
+        >
+          📱
+        </button>
+      )}
 
       {showQR && <QRModal onClose={() => setShowQR(false)} />}
     </div>
