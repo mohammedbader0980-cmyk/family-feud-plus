@@ -111,26 +111,37 @@ export default function FamilyFeud() {
     localStorage.setItem(LS_CUSTOM_CATS, JSON.stringify(customCatalogs));
   }, [customCatalogs, hydrated]);
 
-  // Music (in-memory only — audio files too large for localStorage)
+  // Music — merged from IndexedDB (local) + Supabase Storage (shared via controller)
   const [tracks, setTracks] = useState<Track[]>([]);
-  const [currentTrack, setCurrentTrack] = useState(0);
+  const [currentTrackId, setCurrentTrackId] = useState<string | null>(null);
   const [musicPlaying, setMusicPlaying] = useState(false);
   const [musicVolume, setMusicVolume] = useState(0.5);
+  const [musicLoop, setMusicLoop] = useState(false);
   const musicRef = useRef<HTMLAudioElement | null>(null);
+
+  const currentTrackIndex = useMemo(() => {
+    if (!currentTrackId) return 0;
+    const i = tracks.findIndex((t) => t.id === currentTrackId);
+    return i < 0 ? 0 : i;
+  }, [tracks, currentTrackId]);
+  const currentTrack = currentTrackIndex;
+  const setCurrentTrack = (i: number) => {
+    const t = tracks[i];
+    if (t) setCurrentTrackId(t.id);
+  };
 
   useEffect(() => {
     if (!musicRef.current) return;
     musicRef.current.volume = musicVolume;
   }, [musicVolume]);
 
-  // When current track changes while playing, auto-play the new one
   useEffect(() => {
     if (!musicRef.current || !tracks.length) return;
     if (musicPlaying) {
       musicRef.current.play().catch(() => setMusicPlaying(false));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentTrack]);
+  }, [currentTrackId]);
 
   const toggleMusic = async () => {
     if (!tracks.length || !musicRef.current) return;
@@ -139,6 +150,7 @@ export default function FamilyFeud() {
       setMusicPlaying(false);
     } else {
       try {
+        if (!currentTrackId && tracks[0]) setCurrentTrackId(tracks[0].id);
         await musicRef.current.play();
         setMusicPlaying(true);
       } catch (e) {
@@ -149,24 +161,41 @@ export default function FamilyFeud() {
   };
   const nextTrack = () => {
     if (!tracks.length) return;
-    setCurrentTrack((i) => (i + 1) % tracks.length);
+    const i = (currentTrackIndex + 1) % tracks.length;
+    setCurrentTrackId(tracks[i].id);
   };
-  // Load persisted tracks from IndexedDB on mount
+  const prevTrack = () => {
+    if (!tracks.length) return;
+    const i = (currentTrackIndex - 1 + tracks.length) % tracks.length;
+    setCurrentTrackId(tracks[i].id);
+  };
+  const stopMusic = () => {
+    if (musicRef.current) {
+      musicRef.current.pause();
+      musicRef.current.currentTime = 0;
+    }
+    setMusicPlaying(false);
+  };
+
+  const refreshTracks = async () => {
+    const stored = await idbGetAllTracks();
+    const local: Track[] = stored.map((s) => ({
+      id: `local-${s.id}`,
+      name: s.name,
+      url: URL.createObjectURL(s.blob),
+      source: "local",
+    }));
+    const remote = await loadStorageTracks();
+    setTracks((prev) => {
+      prev.forEach((t) => {
+        if (t.source === "local") URL.revokeObjectURL(t.url);
+      });
+      return [...local, ...remote];
+    });
+  };
   useEffect(() => {
-    let revoked: string[] = [];
-    (async () => {
-      const stored = await idbGetAllTracks();
-      const mapped: Track[] = stored.map((s) => ({
-        id: s.id,
-        name: s.name,
-        url: URL.createObjectURL(s.blob),
-      }));
-      revoked = mapped.map((m) => m.url);
-      setTracks(mapped);
-    })();
-    return () => {
-      revoked.forEach((u) => URL.revokeObjectURL(u));
-    };
+    refreshTracks();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const addTracks = async (files: FileList) => {
@@ -174,7 +203,12 @@ export default function FamilyFeud() {
     for (const f of Array.from(files)) {
       try {
         const saved = await idbAddTrack(f);
-        added.push({ id: saved.id, name: saved.name, url: URL.createObjectURL(saved.blob) });
+        added.push({
+          id: `local-${saved.id}`,
+          name: saved.name,
+          url: URL.createObjectURL(saved.blob),
+          source: "local",
+        });
       } catch (e) {
         console.error("Failed to save track", e);
         alert(`تعذّر حفظ الملف: ${f.name}`);
@@ -186,13 +220,24 @@ export default function FamilyFeud() {
     const target = tracks[idx];
     if (!target) return;
     try {
-      await idbDeleteTrack(target.id);
+      if (target.source === "local") {
+        await idbDeleteTrack(target.id.replace(/^local-/, ""));
+        URL.revokeObjectURL(target.url);
+      } else if (target.source === "storage" && target.storagePath) {
+        await supabase.storage.from(MUSIC_BUCKET).remove([target.storagePath]);
+      }
     } catch (e) {
       console.error("Failed to delete track", e);
     }
-    URL.revokeObjectURL(target.url);
     setTracks((prev) => prev.filter((_, i) => i !== idx));
-    if (currentTrack >= tracks.length - 1) setCurrentTrack(0);
+    if (currentTrackId === target.id) {
+      setCurrentTrackId(null);
+      setMusicPlaying(false);
+    }
+  };
+  const removeTrackById = async (id: string) => {
+    const idx = tracks.findIndex((t) => t.id === id);
+    if (idx >= 0) await removeTrack(idx);
   };
 
 
