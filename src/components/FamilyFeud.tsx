@@ -991,6 +991,7 @@ export default function FamilyFeud() {
       </div>
 
       {/* Control bar */}
+      {!displayMode && (
       <div className="bg-black border-t-2 border-gray-800 flex justify-between items-center px-2 py-2 md:px-6 md:py-3 text-gray-300 text-xs md:text-sm overflow-x-auto gap-2">
         <div className="flex gap-2 flex-shrink-0">
           <button
@@ -998,6 +999,13 @@ export default function FamilyFeud() {
             className="px-3 py-2 bg-gray-900 rounded border border-gray-700 hover:text-white font-bold"
           >
             🏠
+          </button>
+          <button
+            onClick={() => setDisplayMode(true)}
+            className="px-3 py-2 bg-amber-900/60 rounded border border-amber-600 hover:bg-amber-800 text-amber-200 font-bold whitespace-nowrap"
+            title="إخفاء شريط التحكم للعرض على الشاشة"
+          >
+            🖥 وضع العرض
           </button>
           <button
             onClick={() => setShowQuestion(!showQuestion)}
@@ -1103,6 +1111,18 @@ export default function FamilyFeud() {
           </div>
         </div>
       </div>
+      )}
+
+      {/* Exit display-mode button (only visible when in display mode) */}
+      {displayMode && (
+        <button
+          onClick={() => setDisplayMode(false)}
+          className="fixed bottom-3 right-3 z-40 bg-black/30 hover:bg-black/60 text-white/70 hover:text-white text-xs px-3 py-2 rounded-full border border-white/20 backdrop-blur-sm"
+          title="إظهار شريط التحكم"
+        >
+          ⚙
+        </button>
+      )}
 
       {showBigX > 0 && (
         <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/60 pointer-events-none">
