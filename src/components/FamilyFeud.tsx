@@ -1187,7 +1187,7 @@ function QRModal({ onClose }: { onClose: () => void }) {
       >
         <h3 className="text-xl font-bold mb-2 text-white">وحدة تحكم الجوال</h3>
         <p className="text-xs text-gray-400 mb-4">
-          امسح الرمز أو افتح الرابط في نفس المتصفح/الجهاز
+          امسح الرمز بالجوال لفتح وحدة التحكم — بدون تسجيل دخول
         </p>
         <div className="bg-white p-3 rounded-xl inline-block mb-4">
           <img src={qrSrc} alt="QR" width={220} height={220} />
