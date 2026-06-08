@@ -375,6 +375,17 @@ export default function FamilyFeud() {
     currentQ,
     timerRunning,
     showQuestion,
+    nextTrack,
+    prevTrack,
+    stopMusic,
+    setMusicVolume,
+    setMusicLoop,
+    musicLoop,
+    setCurrentTrackId,
+    setMusicPlaying,
+    removeTrackById,
+    refreshTracks,
+    tracks,
   });
   useEffect(() => {
     handlersRef.current = {
@@ -394,32 +405,54 @@ export default function FamilyFeud() {
       currentQ,
       timerRunning,
       showQuestion,
+      nextTrack,
+      prevTrack,
+      stopMusic,
+      setMusicVolume,
+      setMusicLoop,
+      musicLoop,
+      setCurrentTrackId,
+      setMusicPlaying,
+      removeTrackById,
+      refreshTracks,
+      tracks,
     };
   });
 
+  // Build snapshot once for both broadcast points
+  const buildSnapshot = (): import("@/lib/feud-sync").DisplayState["payload"] => {
+    const answers = currentQ.answers || [];
+    return {
+      currentQIndex,
+      totalQuestions: questions.length,
+      questionText: currentQ.question || "",
+      questionHidden: !showQuestion,
+      team1Name,
+      team2Name,
+      team1Score,
+      team2Score,
+      revealed,
+      answerHasText: Array.from({ length: 8 }, (_, i) => !!answers[i]?.text?.trim()),
+      answers: Array.from({ length: 8 }, (_, i) => ({
+        text: answers[i]?.text ?? "",
+        points: Number(answers[i]?.points ?? 0),
+      })),
+      timerSec,
+      timerRunning,
+      musicPlaying,
+      hasMusic: tracks.length > 0,
+      musicVolume,
+      musicLoop,
+      tracks: tracks.map((t) => ({ id: t.id, name: t.name })),
+      currentTrackId,
+      onGameScreen: screen === "game",
+    };
+  };
+
   // Broadcast state snapshot whenever something the controller shows changes
   useEffect(() => {
-    const answers = currentQ.answers || [];
-    sendMessage({
-      action: "STATE",
-      payload: {
-        currentQIndex,
-        totalQuestions: questions.length,
-        questionText: currentQ.question || "",
-        questionHidden: !showQuestion,
-        team1Name,
-        team2Name,
-        team1Score,
-        team2Score,
-        revealed,
-        answerHasText: Array.from({ length: 8 }, (_, i) => !!answers[i]?.text?.trim()),
-        timerSec,
-        timerRunning,
-        musicPlaying,
-        hasMusic: tracks.length > 0,
-        onGameScreen: screen === "game",
-      },
-    });
+    sendMessage({ action: "STATE", payload: buildSnapshot() });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     currentQIndex,
     questions.length,
@@ -433,7 +466,10 @@ export default function FamilyFeud() {
     timerSec,
     timerRunning,
     musicPlaying,
-    tracks.length,
+    musicVolume,
+    musicLoop,
+    tracks,
+    currentTrackId,
     screen,
   ]);
 
@@ -443,27 +479,7 @@ export default function FamilyFeud() {
       const h = handlersRef.current;
       switch (msg.action) {
         case "REQUEST_STATE": {
-          const answers = h.currentQ.answers || [];
-          sendMessage({
-            action: "STATE",
-            payload: {
-              currentQIndex,
-              totalQuestions: questions.length,
-              questionText: h.currentQ.question || "",
-              questionHidden: !h.showQuestion,
-              team1Name,
-              team2Name,
-              team1Score,
-              team2Score,
-              revealed,
-              answerHasText: Array.from({ length: 8 }, (_, i) => !!answers[i]?.text?.trim()),
-              timerSec,
-              timerRunning,
-              musicPlaying,
-              hasMusic: tracks.length > 0,
-              onGameScreen: screen === "game",
-            },
-          });
+          sendMessage({ action: "STATE", payload: buildSnapshot() });
           break;
         }
         case "REVEAL_ANSWER":
@@ -502,6 +518,51 @@ export default function FamilyFeud() {
           break;
         case "GO_HOME":
           h.setScreen("start");
+          break;
+        case "PLAY_TRACK": {
+          const t = h.tracks.find((x) => x.id === msg.payload.id);
+          if (t) {
+            h.setCurrentTrackId(t.id);
+            // Slight delay so audio src updates first, then auto-play kicks in
+            setTimeout(() => {
+              const el = (musicRef as React.MutableRefObject<HTMLAudioElement | null>).current;
+              if (el) {
+                el.play().then(() => h.setMusicPlaying(true)).catch(() => {});
+              }
+            }, 80);
+          }
+          break;
+        }
+        case "PAUSE_MUSIC": {
+          const el = (musicRef as React.MutableRefObject<HTMLAudioElement | null>).current;
+          if (el) el.pause();
+          h.setMusicPlaying(false);
+          break;
+        }
+        case "RESUME_MUSIC": {
+          void h.toggleMusic();
+          break;
+        }
+        case "STOP_MUSIC":
+          h.stopMusic();
+          break;
+        case "NEXT_TRACK":
+          h.nextTrack();
+          break;
+        case "PREV_TRACK":
+          h.prevTrack();
+          break;
+        case "SET_VOLUME":
+          h.setMusicVolume(Math.max(0, Math.min(1, msg.payload.value)));
+          break;
+        case "TOGGLE_LOOP":
+          h.setMusicLoop(!h.musicLoop);
+          break;
+        case "DELETE_TRACK":
+          void h.removeTrackById(msg.payload.id);
+          break;
+        case "TRACKS_UPDATED":
+          void h.refreshTracks();
           break;
       }
     });
