@@ -258,8 +258,7 @@ export default function FeudController() {
         </div>
 
         <p className="text-[10px] text-muted-foreground text-center mt-2">
-          يعمل عبر BroadcastChannel - افتح هذه الصفحة في نفس المتصفح/الجهاز الذي تعمل عليه الشاشة
-          الرئيسية.
+          متصل عبر الشبكة - يمكن استخدامه من أي جهاز يمسح رمز QR
         </p>
       </div>
     </div>

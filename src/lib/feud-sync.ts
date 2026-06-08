@@ -42,7 +42,7 @@ export type DisplayState = {
 
 export type SyncMessage = ControllerAction | DisplayState;
 
-const ROOM = "feud-room";
+const ROOM = "feud-control";
 const EVENT = "sync";
 
 // A unique id per tab/device, so we can ignore echoes of our own messages.
