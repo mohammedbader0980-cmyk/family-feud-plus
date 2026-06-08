@@ -14,8 +14,46 @@ import {
   idbGetAllTracks,
 } from "@/lib/music-db";
 import { sendMessage, subscribe, type SyncMessage } from "@/lib/feud-sync";
+import { supabase } from "@/integrations/supabase/client";
 
-type Track = { id: string; name: string; url: string };
+type Track = {
+  id: string;
+  name: string;
+  url: string;
+  source: "local" | "storage";
+  storagePath?: string;
+};
+
+const MUSIC_BUCKET = "feud-music";
+
+const loadStorageTracks = async (): Promise<Track[]> => {
+  try {
+    const { data, error } = await supabase.storage.from(MUSIC_BUCKET).list("", {
+      limit: 200,
+      sortBy: { column: "created_at", order: "asc" },
+    });
+    if (error || !data) return [];
+    const tracks: Track[] = [];
+    for (const f of data) {
+      if (!f.name || f.name.startsWith(".")) continue;
+      const { data: signed } = await supabase.storage
+        .from(MUSIC_BUCKET)
+        .createSignedUrl(f.name, 60 * 60 * 24 * 7);
+      if (!signed?.signedUrl) continue;
+      tracks.push({
+        id: `storage-${f.name}`,
+        name: f.name.replace(/^\d+-/, ""),
+        url: signed.signedUrl,
+        source: "storage",
+        storagePath: f.name,
+      });
+    }
+    return tracks;
+  } catch (e) {
+    console.error("[music] storage list failed", e);
+    return [];
+  }
+};
 
 
 type Screen = "start" | "host" | "game";
