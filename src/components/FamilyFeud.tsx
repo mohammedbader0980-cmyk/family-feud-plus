@@ -14,8 +14,46 @@ import {
   idbGetAllTracks,
 } from "@/lib/music-db";
 import { sendMessage, subscribe, type SyncMessage } from "@/lib/feud-sync";
+import { supabase } from "@/integrations/supabase/client";
 
-type Track = { id: string; name: string; url: string };
+type Track = {
+  id: string;
+  name: string;
+  url: string;
+  source: "local" | "storage";
+  storagePath?: string;
+};
+
+const MUSIC_BUCKET = "feud-music";
+
+const loadStorageTracks = async (): Promise<Track[]> => {
+  try {
+    const { data, error } = await supabase.storage.from(MUSIC_BUCKET).list("", {
+      limit: 200,
+      sortBy: { column: "created_at", order: "asc" },
+    });
+    if (error || !data) return [];
+    const tracks: Track[] = [];
+    for (const f of data) {
+      if (!f.name || f.name.startsWith(".")) continue;
+      const { data: signed } = await supabase.storage
+        .from(MUSIC_BUCKET)
+        .createSignedUrl(f.name, 60 * 60 * 24 * 7);
+      if (!signed?.signedUrl) continue;
+      tracks.push({
+        id: `storage-${f.name}`,
+        name: f.name.replace(/^\d+-/, ""),
+        url: signed.signedUrl,
+        source: "storage",
+        storagePath: f.name,
+      });
+    }
+    return tracks;
+  } catch (e) {
+    console.error("[music] storage list failed", e);
+    return [];
+  }
+};
 
 
 type Screen = "start" | "host" | "game";
@@ -73,26 +111,37 @@ export default function FamilyFeud() {
     localStorage.setItem(LS_CUSTOM_CATS, JSON.stringify(customCatalogs));
   }, [customCatalogs, hydrated]);
 
-  // Music (in-memory only — audio files too large for localStorage)
+  // Music — merged from IndexedDB (local) + Supabase Storage (shared via controller)
   const [tracks, setTracks] = useState<Track[]>([]);
-  const [currentTrack, setCurrentTrack] = useState(0);
+  const [currentTrackId, setCurrentTrackId] = useState<string | null>(null);
   const [musicPlaying, setMusicPlaying] = useState(false);
   const [musicVolume, setMusicVolume] = useState(0.5);
+  const [musicLoop, setMusicLoop] = useState(false);
   const musicRef = useRef<HTMLAudioElement | null>(null);
+
+  const currentTrackIndex = useMemo(() => {
+    if (!currentTrackId) return 0;
+    const i = tracks.findIndex((t) => t.id === currentTrackId);
+    return i < 0 ? 0 : i;
+  }, [tracks, currentTrackId]);
+  const currentTrack = currentTrackIndex;
+  const setCurrentTrack = (i: number) => {
+    const t = tracks[i];
+    if (t) setCurrentTrackId(t.id);
+  };
 
   useEffect(() => {
     if (!musicRef.current) return;
     musicRef.current.volume = musicVolume;
   }, [musicVolume]);
 
-  // When current track changes while playing, auto-play the new one
   useEffect(() => {
     if (!musicRef.current || !tracks.length) return;
     if (musicPlaying) {
       musicRef.current.play().catch(() => setMusicPlaying(false));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentTrack]);
+  }, [currentTrackId]);
 
   const toggleMusic = async () => {
     if (!tracks.length || !musicRef.current) return;
@@ -101,6 +150,7 @@ export default function FamilyFeud() {
       setMusicPlaying(false);
     } else {
       try {
+        if (!currentTrackId && tracks[0]) setCurrentTrackId(tracks[0].id);
         await musicRef.current.play();
         setMusicPlaying(true);
       } catch (e) {
@@ -111,24 +161,41 @@ export default function FamilyFeud() {
   };
   const nextTrack = () => {
     if (!tracks.length) return;
-    setCurrentTrack((i) => (i + 1) % tracks.length);
+    const i = (currentTrackIndex + 1) % tracks.length;
+    setCurrentTrackId(tracks[i].id);
   };
-  // Load persisted tracks from IndexedDB on mount
+  const prevTrack = () => {
+    if (!tracks.length) return;
+    const i = (currentTrackIndex - 1 + tracks.length) % tracks.length;
+    setCurrentTrackId(tracks[i].id);
+  };
+  const stopMusic = () => {
+    if (musicRef.current) {
+      musicRef.current.pause();
+      musicRef.current.currentTime = 0;
+    }
+    setMusicPlaying(false);
+  };
+
+  const refreshTracks = async () => {
+    const stored = await idbGetAllTracks();
+    const local: Track[] = stored.map((s) => ({
+      id: `local-${s.id}`,
+      name: s.name,
+      url: URL.createObjectURL(s.blob),
+      source: "local",
+    }));
+    const remote = await loadStorageTracks();
+    setTracks((prev) => {
+      prev.forEach((t) => {
+        if (t.source === "local") URL.revokeObjectURL(t.url);
+      });
+      return [...local, ...remote];
+    });
+  };
   useEffect(() => {
-    let revoked: string[] = [];
-    (async () => {
-      const stored = await idbGetAllTracks();
-      const mapped: Track[] = stored.map((s) => ({
-        id: s.id,
-        name: s.name,
-        url: URL.createObjectURL(s.blob),
-      }));
-      revoked = mapped.map((m) => m.url);
-      setTracks(mapped);
-    })();
-    return () => {
-      revoked.forEach((u) => URL.revokeObjectURL(u));
-    };
+    refreshTracks();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const addTracks = async (files: FileList) => {
@@ -136,7 +203,12 @@ export default function FamilyFeud() {
     for (const f of Array.from(files)) {
       try {
         const saved = await idbAddTrack(f);
-        added.push({ id: saved.id, name: saved.name, url: URL.createObjectURL(saved.blob) });
+        added.push({
+          id: `local-${saved.id}`,
+          name: saved.name,
+          url: URL.createObjectURL(saved.blob),
+          source: "local",
+        });
       } catch (e) {
         console.error("Failed to save track", e);
         alert(`تعذّر حفظ الملف: ${f.name}`);
@@ -148,13 +220,24 @@ export default function FamilyFeud() {
     const target = tracks[idx];
     if (!target) return;
     try {
-      await idbDeleteTrack(target.id);
+      if (target.source === "local") {
+        await idbDeleteTrack(target.id.replace(/^local-/, ""));
+        URL.revokeObjectURL(target.url);
+      } else if (target.source === "storage" && target.storagePath) {
+        await supabase.storage.from(MUSIC_BUCKET).remove([target.storagePath]);
+      }
     } catch (e) {
       console.error("Failed to delete track", e);
     }
-    URL.revokeObjectURL(target.url);
     setTracks((prev) => prev.filter((_, i) => i !== idx));
-    if (currentTrack >= tracks.length - 1) setCurrentTrack(0);
+    if (currentTrackId === target.id) {
+      setCurrentTrackId(null);
+      setMusicPlaying(false);
+    }
+  };
+  const removeTrackById = async (id: string) => {
+    const idx = tracks.findIndex((t) => t.id === id);
+    if (idx >= 0) await removeTrack(idx);
   };
 
 
@@ -292,6 +375,17 @@ export default function FamilyFeud() {
     currentQ,
     timerRunning,
     showQuestion,
+    nextTrack,
+    prevTrack,
+    stopMusic,
+    setMusicVolume,
+    setMusicLoop,
+    musicLoop,
+    setCurrentTrackId,
+    setMusicPlaying,
+    removeTrackById,
+    refreshTracks,
+    tracks,
   });
   useEffect(() => {
     handlersRef.current = {
@@ -311,32 +405,54 @@ export default function FamilyFeud() {
       currentQ,
       timerRunning,
       showQuestion,
+      nextTrack,
+      prevTrack,
+      stopMusic,
+      setMusicVolume,
+      setMusicLoop,
+      musicLoop,
+      setCurrentTrackId,
+      setMusicPlaying,
+      removeTrackById,
+      refreshTracks,
+      tracks,
     };
   });
 
+  // Build snapshot once for both broadcast points
+  const buildSnapshot = (): import("@/lib/feud-sync").DisplayState["payload"] => {
+    const answers = currentQ.answers || [];
+    return {
+      currentQIndex,
+      totalQuestions: questions.length,
+      questionText: currentQ.question || "",
+      questionHidden: !showQuestion,
+      team1Name,
+      team2Name,
+      team1Score,
+      team2Score,
+      revealed,
+      answerHasText: Array.from({ length: 8 }, (_, i) => !!answers[i]?.text?.trim()),
+      answers: Array.from({ length: 8 }, (_, i) => ({
+        text: answers[i]?.text ?? "",
+        points: Number(answers[i]?.points ?? 0),
+      })),
+      timerSec,
+      timerRunning,
+      musicPlaying,
+      hasMusic: tracks.length > 0,
+      musicVolume,
+      musicLoop,
+      tracks: tracks.map((t) => ({ id: t.id, name: t.name })),
+      currentTrackId,
+      onGameScreen: screen === "game",
+    };
+  };
+
   // Broadcast state snapshot whenever something the controller shows changes
   useEffect(() => {
-    const answers = currentQ.answers || [];
-    sendMessage({
-      action: "STATE",
-      payload: {
-        currentQIndex,
-        totalQuestions: questions.length,
-        questionText: currentQ.question || "",
-        questionHidden: !showQuestion,
-        team1Name,
-        team2Name,
-        team1Score,
-        team2Score,
-        revealed,
-        answerHasText: Array.from({ length: 8 }, (_, i) => !!answers[i]?.text?.trim()),
-        timerSec,
-        timerRunning,
-        musicPlaying,
-        hasMusic: tracks.length > 0,
-        onGameScreen: screen === "game",
-      },
-    });
+    sendMessage({ action: "STATE", payload: buildSnapshot() });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     currentQIndex,
     questions.length,
@@ -350,7 +466,10 @@ export default function FamilyFeud() {
     timerSec,
     timerRunning,
     musicPlaying,
-    tracks.length,
+    musicVolume,
+    musicLoop,
+    tracks,
+    currentTrackId,
     screen,
   ]);
 
@@ -360,27 +479,7 @@ export default function FamilyFeud() {
       const h = handlersRef.current;
       switch (msg.action) {
         case "REQUEST_STATE": {
-          const answers = h.currentQ.answers || [];
-          sendMessage({
-            action: "STATE",
-            payload: {
-              currentQIndex,
-              totalQuestions: questions.length,
-              questionText: h.currentQ.question || "",
-              questionHidden: !h.showQuestion,
-              team1Name,
-              team2Name,
-              team1Score,
-              team2Score,
-              revealed,
-              answerHasText: Array.from({ length: 8 }, (_, i) => !!answers[i]?.text?.trim()),
-              timerSec,
-              timerRunning,
-              musicPlaying,
-              hasMusic: tracks.length > 0,
-              onGameScreen: screen === "game",
-            },
-          });
+          sendMessage({ action: "STATE", payload: buildSnapshot() });
           break;
         }
         case "REVEAL_ANSWER":
@@ -419,6 +518,51 @@ export default function FamilyFeud() {
           break;
         case "GO_HOME":
           h.setScreen("start");
+          break;
+        case "PLAY_TRACK": {
+          const t = h.tracks.find((x) => x.id === msg.payload.id);
+          if (t) {
+            h.setCurrentTrackId(t.id);
+            // Slight delay so audio src updates first, then auto-play kicks in
+            setTimeout(() => {
+              const el = (musicRef as React.MutableRefObject<HTMLAudioElement | null>).current;
+              if (el) {
+                el.play().then(() => h.setMusicPlaying(true)).catch(() => {});
+              }
+            }, 80);
+          }
+          break;
+        }
+        case "PAUSE_MUSIC": {
+          const el = (musicRef as React.MutableRefObject<HTMLAudioElement | null>).current;
+          if (el) el.pause();
+          h.setMusicPlaying(false);
+          break;
+        }
+        case "RESUME_MUSIC": {
+          void h.toggleMusic();
+          break;
+        }
+        case "STOP_MUSIC":
+          h.stopMusic();
+          break;
+        case "NEXT_TRACK":
+          h.nextTrack();
+          break;
+        case "PREV_TRACK":
+          h.prevTrack();
+          break;
+        case "SET_VOLUME":
+          h.setMusicVolume(Math.max(0, Math.min(1, msg.payload.value)));
+          break;
+        case "TOGGLE_LOOP":
+          h.setMusicLoop(!h.musicLoop);
+          break;
+        case "DELETE_TRACK":
+          void h.removeTrackById(msg.payload.id);
+          break;
+        case "TRACKS_UPDATED":
+          void h.refreshTracks();
           break;
       }
     });
@@ -1142,7 +1286,7 @@ export default function FamilyFeud() {
           ref={musicRef}
           src={tracks[currentTrack]?.url}
           onEnded={nextTrack}
-          loop={tracks.length === 1}
+          loop={musicLoop || tracks.length === 1}
         />
       )}
 

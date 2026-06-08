@@ -1,5 +1,5 @@
 // Cross-device sync via Supabase Realtime broadcast.
-// Channel "feud-room" - public access, no auth required.
+// Channel "feud-control" - public access, no auth required.
 
 import { supabase } from "@/integrations/supabase/client";
 import type { RealtimeChannel } from "@supabase/supabase-js";
@@ -17,7 +17,18 @@ export type ControllerAction =
   | { action: "RESET_QUESTION" }
   | { action: "UPDATE_SCORE"; payload: { team: 1 | 2; delta: number } }
   | { action: "GO_HOME" }
-  | { action: "REQUEST_STATE" };
+  | { action: "REQUEST_STATE" }
+  // Music controls from controller
+  | { action: "PLAY_TRACK"; payload: { id: string } }
+  | { action: "PAUSE_MUSIC" }
+  | { action: "RESUME_MUSIC" }
+  | { action: "STOP_MUSIC" }
+  | { action: "NEXT_TRACK" }
+  | { action: "PREV_TRACK" }
+  | { action: "SET_VOLUME"; payload: { value: number } }
+  | { action: "TOGGLE_LOOP" }
+  | { action: "DELETE_TRACK"; payload: { id: string } }
+  | { action: "TRACKS_UPDATED" };
 
 export type DisplayState = {
   action: "STATE";
@@ -32,10 +43,15 @@ export type DisplayState = {
     team2Score: number;
     revealed: boolean[];
     answerHasText: boolean[];
+    answers: { text: string; points: number }[];
     timerSec: number;
     timerRunning: boolean;
     musicPlaying: boolean;
     hasMusic: boolean;
+    musicVolume: number;
+    musicLoop: boolean;
+    tracks: { id: string; name: string }[];
+    currentTrackId: string | null;
     onGameScreen: boolean;
   };
 };
@@ -45,7 +61,6 @@ export type SyncMessage = ControllerAction | DisplayState;
 const ROOM = "feud-control";
 const EVENT = "sync";
 
-// A unique id per tab/device, so we can ignore echoes of our own messages.
 const SENDER_ID =
   typeof crypto !== "undefined" && "randomUUID" in crypto
     ? crypto.randomUUID()
