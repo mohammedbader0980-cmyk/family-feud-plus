@@ -1286,7 +1286,7 @@ export default function FamilyFeud() {
           ref={musicRef}
           src={tracks[currentTrack]?.url}
           onEnded={nextTrack}
-          loop={tracks.length === 1}
+          loop={musicLoop || tracks.length === 1}
         />
       )}
 
