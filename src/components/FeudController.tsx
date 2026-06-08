@@ -1,7 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { sendMessage, subscribe, type DisplayState, type SyncMessage } from "@/lib/feud-sync";
+import { supabase } from "@/integrations/supabase/client";
 
 type State = DisplayState["payload"];
+
+const MUSIC_BUCKET = "feud-music";
 
 const defaultState: State = {
   currentQIndex: 0,
@@ -14,15 +17,20 @@ const defaultState: State = {
   team2Score: 0,
   revealed: Array(8).fill(false),
   answerHasText: Array(8).fill(false),
+  answers: Array.from({ length: 8 }, () => ({ text: "", points: 0 })),
   timerSec: 30,
   timerRunning: false,
   musicPlaying: false,
   hasMusic: false,
+  musicVolume: 0.5,
+  musicLoop: false,
+  tracks: [],
+  currentTrackId: null,
   onGameScreen: false,
 };
 
 const btnBase =
-  "min-h-[64px] rounded-xl font-bold text-base md:text-lg px-3 py-3 active:scale-95 transition-transform shadow-md border-2 disabled:opacity-40 disabled:active:scale-100 select-none";
+  "min-h-[56px] rounded-xl font-bold text-base px-3 py-3 active:scale-95 transition-transform shadow-md border-2 disabled:opacity-40 disabled:active:scale-100 select-none";
 
 const colors = {
   red: "bg-red-700 hover:bg-red-600 border-red-900 text-white",
@@ -31,13 +39,13 @@ const colors = {
   green: "bg-emerald-700 hover:bg-emerald-600 border-emerald-900 text-white",
   purple: "bg-purple-700 hover:bg-purple-600 border-purple-900 text-white",
   gray: "bg-gray-700 hover:bg-gray-600 border-gray-900 text-white",
-  goldActive: "bg-amber-300 border-amber-500 text-black ring-2 ring-amber-200",
   purpleActive: "bg-purple-400 border-purple-300 text-black ring-2 ring-purple-200",
 } as const;
 
 export default function FeudController() {
   const [state, setState] = useState<State>(defaultState);
   const [connected, setConnected] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     const off = subscribe((msg: SyncMessage) => {
@@ -46,7 +54,6 @@ export default function FeudController() {
         setConnected(true);
       }
     });
-    // Ask the display for its current state
     sendMessage({ action: "REQUEST_STATE" });
     const t = window.setInterval(() => {
       if (!connected) sendMessage({ action: "REQUEST_STATE" });
@@ -63,10 +70,50 @@ export default function FeudController() {
     state.timerSec % 60,
   ).padStart(2, "0")}`;
 
+  const currentTrack = state.tracks.find((t) => t.id === state.currentTrackId);
+
+  // Upload directly to Supabase Storage from phone
+  const uploadFiles = async (files: FileList) => {
+    if (!files.length) return;
+    setUploading(true);
+    try {
+      for (const f of Array.from(files)) {
+        const safeName = f.name.replace(/[^\w.\-]+/g, "_");
+        const path = `${Date.now()}-${safeName}`;
+        const { error } = await supabase.storage
+          .from(MUSIC_BUCKET)
+          .upload(path, f, { contentType: f.type || "audio/mpeg", upsert: false });
+        if (error) {
+          console.error("upload error", error);
+          alert(`تعذّر رفع: ${f.name}\n${error.message}`);
+        }
+      }
+      send({ action: "TRACKS_UPDATED" });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // Long-press to delete
+  const pressTimer = useRef<number | null>(null);
+  const startPress = (id: string) => {
+    pressTimer.current = window.setTimeout(() => {
+      if (window.confirm("حذف هذه الأغنية؟")) {
+        send({ action: "DELETE_TRACK", payload: { id } });
+      }
+    }, 700);
+  };
+  const cancelPress = () => {
+    if (pressTimer.current) {
+      window.clearTimeout(pressTimer.current);
+      pressTimer.current = null;
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background text-foreground p-3 pb-10" dir="rtl">
       <div className="max-w-[480px] mx-auto flex flex-col gap-3">
-        {/* Header status card */}
+        {/* Header status */}
         <div className="rounded-2xl bg-card border border-border p-4 shadow-lg">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs text-muted-foreground">وحدة تحكم حارة البطل</span>
@@ -82,7 +129,7 @@ export default function FeudController() {
             سؤال {state.currentQIndex + 1} من {state.totalQuestions || "—"}
           </div>
           <div className="text-base font-bold mb-3 min-h-[1.5rem]">
-            {state.questionHidden ? "(السؤال مخفي)" : state.questionText || "—"}
+            {state.questionText || "—"}
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div className="rounded-lg bg-secondary p-2 text-center">
@@ -103,6 +150,64 @@ export default function FeudController() {
               ⏱ {fmtTimer} {state.timerRunning ? "(يعمل)" : ""}
             </span>
           </div>
+        </div>
+
+        {/* ============ ANSWER CHEAT SHEET ============ */}
+        <div className="rounded-2xl bg-card border-2 border-amber-700/40 p-3 shadow-lg">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-bold text-amber-300">📋 ورقة الإجابات (سرية)</h3>
+            <span className="text-[10px] text-muted-foreground">
+              يراها المضيف فقط
+            </span>
+          </div>
+          <ul className="space-y-1.5">
+            {state.answers.map((a, i) => {
+              const hasText = !!a.text?.trim();
+              const revealed = state.revealed[i];
+              if (!hasText) {
+                return (
+                  <li
+                    key={i}
+                    className="flex items-center gap-2 p-2 rounded bg-secondary/30 border border-border/50 opacity-40 text-xs text-muted-foreground"
+                  >
+                    <span className="w-5 text-center">{i + 1}</span>
+                    <span className="flex-1">— فارغ —</span>
+                  </li>
+                );
+              }
+              return (
+                <li
+                  key={i}
+                  className={`flex items-center gap-2 p-2 rounded border ${
+                    revealed
+                      ? "bg-emerald-900/30 border-emerald-700"
+                      : "bg-secondary border-border"
+                  }`}
+                >
+                  <span className="w-5 text-center text-xs text-muted-foreground">
+                    {i + 1}
+                  </span>
+                  <button
+                    onClick={() => send({ action: "REVEAL_ANSWER", payload: { index: i } })}
+                    disabled={revealed}
+                    className={`min-w-[64px] px-2 py-1.5 rounded text-xs font-bold border-2 active:scale-95 transition-transform ${
+                      revealed
+                        ? "bg-emerald-700 border-emerald-900 text-white"
+                        : "bg-blue-700 hover:bg-blue-600 border-blue-900 text-white"
+                    }`}
+                  >
+                    {revealed ? "✅ مكشوفة" : "🔒 كشف"}
+                  </button>
+                  <span className="w-10 text-center font-black text-amber-400 text-sm">
+                    {a.points}
+                  </span>
+                  <span className="flex-1 text-sm font-bold truncate text-right">
+                    {a.text}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
         </div>
 
         {/* Row 1: Wrong answers */}
@@ -134,30 +239,23 @@ export default function FeudController() {
           </button>
         </div>
 
-        {/* Row 3: Playback */}
-        <div className="grid grid-cols-3 gap-2">
-          <button
-            onClick={() => send({ action: "TOGGLE_MUSIC" })}
-            disabled={!state.hasMusic}
-            className={`${btnBase} ${state.musicPlaying ? colors.purpleActive : colors.purple}`}
-          >
-            {state.musicPlaying ? "⏸ موسيقى" : "🎵 موسيقى"}
-          </button>
+        {/* Row 3: Reset / timer */}
+        <div className="grid grid-cols-2 gap-2">
           <button
             onClick={() => send({ action: "RESET_QUESTION" })}
             className={`${btnBase} ${colors.gray}`}
           >
-            ↺ إعادة
+            ↺ إعادة السؤال
           </button>
           <button
             onClick={() => send({ action: "START_TIMER" })}
             className={`${btnBase} ${state.timerRunning ? colors.purpleActive : colors.purple}`}
           >
-            30s ⏱️
+            ⏱️ 30s
           </button>
         </div>
 
-        {/* Row 4: Navigation (RTL: previous on the right visually) */}
+        {/* Row 4: Navigation */}
         <div className="grid grid-cols-2 gap-2">
           <button
             onClick={() => send({ action: "PREV_QUESTION" })}
@@ -173,7 +271,7 @@ export default function FeudController() {
           </button>
         </div>
 
-        {/* Row 5: Reveal controls */}
+        {/* Row 5: Reveal / hide */}
         <div className="grid grid-cols-3 gap-2">
           <button
             onClick={() => send({ action: "REVEAL_ALL" })}
@@ -195,32 +293,7 @@ export default function FeudController() {
           </button>
         </div>
 
-        {/* Row 6: Individual reveal */}
-        <div className="rounded-2xl bg-card border border-border p-3">
-          <div className="text-xs text-muted-foreground mb-2">كشف الإجابات</div>
-          <div className="grid grid-cols-4 gap-2">
-            {Array.from({ length: 8 }).map((_, i) => {
-              const revealed = state.revealed[i];
-              const hasText = state.answerHasText[i];
-              return (
-                <button
-                  key={i}
-                  onClick={() => send({ action: "REVEAL_ANSWER", payload: { index: i } })}
-                  disabled={!hasText || revealed}
-                  className={`${btnBase} ${
-                    revealed
-                      ? "bg-emerald-900 border-emerald-700 text-emerald-300"
-                      : "bg-blue-700 hover:bg-blue-600 border-blue-900 text-white"
-                  }`}
-                >
-                  {revealed ? "✓" : "كشف"} {i + 1}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Row 7: Scores */}
+        {/* Row 6: Scores */}
         <div className="rounded-2xl bg-card border border-border p-3">
           <div className="text-xs text-muted-foreground mb-2">تعديل النقاط</div>
           <div className="grid grid-cols-2 gap-2">
@@ -255,6 +328,154 @@ export default function FeudController() {
               </button>
             </div>
           </div>
+        </div>
+
+        {/* ============ MUSIC PLAYER ============ */}
+        <div className="rounded-2xl bg-card border-2 border-purple-700/40 p-3 shadow-lg">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-bold text-purple-300">🎵 الموسيقى (تشتغل على الشاشة)</h3>
+          </div>
+
+          {/* Currently playing */}
+          <div className="bg-secondary/60 rounded-lg p-2 mb-3 text-center">
+            <div className="text-[10px] text-muted-foreground">الآن</div>
+            <div className="text-sm font-bold truncate">
+              {currentTrack?.name || "— لم تُختار أغنية —"}
+            </div>
+            <div className="text-[10px] text-purple-300 mt-1">
+              {state.musicPlaying ? "▶ يعمل" : "⏸ متوقف"}
+              {state.musicLoop ? " · 🔁 تكرار" : ""}
+            </div>
+          </div>
+
+          {/* Player controls */}
+          <div className="grid grid-cols-5 gap-1.5 mb-3">
+            <button
+              onClick={() => send({ action: "PREV_TRACK" })}
+              disabled={!state.hasMusic}
+              className={`${btnBase} ${colors.gray} min-h-[48px] text-lg px-0`}
+            >
+              ⏮
+            </button>
+            <button
+              onClick={() =>
+                send({ action: state.musicPlaying ? "PAUSE_MUSIC" : "RESUME_MUSIC" })
+              }
+              disabled={!state.hasMusic}
+              className={`${btnBase} ${state.musicPlaying ? colors.purpleActive : colors.purple} min-h-[48px] text-lg px-0`}
+            >
+              {state.musicPlaying ? "⏸" : "▶"}
+            </button>
+            <button
+              onClick={() => send({ action: "STOP_MUSIC" })}
+              disabled={!state.hasMusic}
+              className={`${btnBase} ${colors.red} min-h-[48px] text-lg px-0`}
+            >
+              ⏹
+            </button>
+            <button
+              onClick={() => send({ action: "NEXT_TRACK" })}
+              disabled={!state.hasMusic}
+              className={`${btnBase} ${colors.gray} min-h-[48px] text-lg px-0`}
+            >
+              ⏭
+            </button>
+            <button
+              onClick={() => send({ action: "TOGGLE_LOOP" })}
+              className={`${btnBase} ${state.musicLoop ? colors.purpleActive : colors.purple} min-h-[48px] text-lg px-0`}
+            >
+              🔁
+            </button>
+          </div>
+
+          {/* Volume */}
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-sm">🔊</span>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.01}
+              value={state.musicVolume}
+              onChange={(e) =>
+                send({ action: "SET_VOLUME", payload: { value: Number(e.target.value) } })
+              }
+              className="flex-1 accent-purple-500"
+            />
+            <span className="text-xs w-10 text-center font-mono">
+              {Math.round(state.musicVolume * 100)}%
+            </span>
+          </div>
+
+          {/* Upload */}
+          <label
+            className={`block text-center px-3 py-2.5 rounded-lg font-bold text-white text-sm cursor-pointer mb-3 ${
+              uploading
+                ? "bg-gray-600 cursor-wait"
+                : "bg-purple-700 hover:bg-purple-600 active:scale-95"
+            }`}
+          >
+            {uploading ? "جارٍ الرفع..." : "⬆️ رفع أغنية MP3"}
+            <input
+              type="file"
+              accept="audio/*"
+              multiple
+              disabled={uploading}
+              className="hidden"
+              onChange={(e) => {
+                if (e.target.files?.length) void uploadFiles(e.target.files);
+                e.target.value = "";
+              }}
+            />
+          </label>
+
+          {/* Playlist */}
+          {state.tracks.length === 0 ? (
+            <p className="text-center text-xs text-muted-foreground italic py-2">
+              لا توجد أغاني — ارفع MP3 من جوالك
+            </p>
+          ) : (
+            <ul className="space-y-1.5 max-h-72 overflow-y-auto">
+              {state.tracks.map((t) => {
+                const active = t.id === state.currentTrackId;
+                return (
+                  <li
+                    key={t.id}
+                    onPointerDown={() => startPress(t.id)}
+                    onPointerUp={cancelPress}
+                    onPointerLeave={cancelPress}
+                    onPointerCancel={cancelPress}
+                    className={`flex items-center gap-2 p-2 rounded border select-none ${
+                      active
+                        ? "bg-purple-900/40 border-purple-500"
+                        : "bg-secondary border-border"
+                    }`}
+                  >
+                    <button
+                      onClick={() => send({ action: "PLAY_TRACK", payload: { id: t.id } })}
+                      className="flex-1 text-right text-sm truncate"
+                    >
+                      {active && state.musicPlaying ? "▶ " : ""}
+                      {t.name}
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (window.confirm("حذف هذه الأغنية؟")) {
+                          send({ action: "DELETE_TRACK", payload: { id: t.id } });
+                        }
+                      }}
+                      className="text-red-400 hover:text-red-200 text-xs px-2 py-1 rounded bg-red-900/30"
+                    >
+                      ✕
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          <p className="text-[10px] text-muted-foreground text-center mt-2">
+            اضغط مطولاً على الأغنية للحذف
+          </p>
         </div>
 
         <p className="text-[10px] text-muted-foreground text-center mt-2">
