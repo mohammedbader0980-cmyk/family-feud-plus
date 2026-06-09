@@ -28,7 +28,8 @@ export type ControllerAction =
   | { action: "SET_VOLUME"; payload: { value: number } }
   | { action: "TOGGLE_LOOP" }
   | { action: "DELETE_TRACK"; payload: { id: string } }
-  | { action: "TRACKS_UPDATED" };
+  | { action: "TRACKS_UPDATED" }
+  | { action: "SET_TEAM_PHOTO"; payload: { team: 1 | 2; url: string | null } };
 
 export type DisplayState = {
   action: "STATE";
