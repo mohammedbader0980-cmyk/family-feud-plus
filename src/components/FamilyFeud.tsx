@@ -601,6 +601,11 @@ export default function FamilyFeud() {
         case "TRACKS_UPDATED":
           void h.refreshTracks();
           break;
+        case "SET_TEAM_PHOTO": {
+          const setter = msg.payload.team === 1 ? setTeam1Photo : setTeam2Photo;
+          setter(msg.payload.url);
+          break;
+        }
       }
     });
     return off;
