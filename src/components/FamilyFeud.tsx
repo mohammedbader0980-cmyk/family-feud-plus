@@ -127,8 +127,7 @@ export default function FamilyFeud() {
     setScoreBump((b) => ({ ...b, t2: b.t2 + 1 }));
   }, [team2Score, hydrated]);
 
-  // dummy to preserve original closing brace line
-  useEffect(() => {
+
 
   useEffect(() => {
     if (!hydrated) return;
