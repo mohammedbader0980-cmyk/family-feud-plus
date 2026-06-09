@@ -28,6 +28,8 @@ const defaultState: State = {
   tracks: [],
   currentTrackId: null,
   onGameScreen: false,
+  team1Photo: null,
+  team2Photo: null,
 };
 
 const btnBase =
