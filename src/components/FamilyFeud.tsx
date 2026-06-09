@@ -117,15 +117,6 @@ export default function FamilyFeud() {
     })();
   }, []);
 
-  // Animate score bumps
-  useEffect(() => {
-    if (!hydrated) return;
-    setScoreBump((b) => ({ ...b, t1: b.t1 + 1 }));
-  }, [team1Score, hydrated]);
-  useEffect(() => {
-    if (!hydrated) return;
-    setScoreBump((b) => ({ ...b, t2: b.t2 + 1 }));
-  }, [team2Score, hydrated]);
 
 
 
