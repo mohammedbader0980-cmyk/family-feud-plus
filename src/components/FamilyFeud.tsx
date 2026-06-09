@@ -479,6 +479,8 @@ export default function FamilyFeud() {
       tracks: tracks.map((t) => ({ id: t.id, name: t.name })),
       currentTrackId,
       onGameScreen: screen === "game",
+      team1Photo,
+      team2Photo,
     };
   };
 
@@ -504,6 +506,8 @@ export default function FamilyFeud() {
     tracks,
     currentTrackId,
     screen,
+    team1Photo,
+    team2Photo,
   ]);
 
   // Subscribe to controller actions
