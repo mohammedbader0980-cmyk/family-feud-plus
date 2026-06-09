@@ -410,6 +410,72 @@ export default function FeudController() {
           </div>
         </div>
 
+        {/* ============ TEAM PHOTOS ============ */}
+        <div className="rounded-2xl bg-card border-2 border-blue-700/40 p-3 shadow-lg">
+          <h3 className="text-sm font-bold text-blue-300 mb-3">👥 إعدادات الفرق</h3>
+          {([1, 2] as const).map((team) => {
+            const photo = team === 1 ? state.team1Photo : state.team2Photo;
+            const tname = team === 1 ? state.team1Name : state.team2Name;
+            const placeholderBg = team === 1 ? "bg-blue-600" : "bg-red-600";
+            const numeral = team === 1 ? "١" : "٢";
+            const busy = photoUploading === team;
+            return (
+              <div
+                key={team}
+                className="flex items-center gap-3 p-2 mb-2 rounded-lg bg-secondary/40 border border-border"
+              >
+                <div
+                  className={`w-16 h-16 rounded-full overflow-hidden border-2 border-white/70 flex items-center justify-center font-black text-white text-2xl shadow ${
+                    photo ? "bg-black" : placeholderBg
+                  }`}
+                >
+                  {photo ? (
+                    <img src={photo} alt={tname} className="w-full h-full object-cover" />
+                  ) : (
+                    <span>{numeral}</span>
+                  )}
+                </div>
+                <div className="flex-1">
+                  <div className="text-sm font-bold truncate mb-1">{tname}</div>
+                  <div className="flex gap-1.5">
+                    <label
+                      className={`flex-1 text-center px-2 py-2 rounded font-bold text-white text-xs ${
+                        busy
+                          ? "bg-gray-600 cursor-wait"
+                          : "bg-blue-700 hover:bg-blue-600 active:scale-95 cursor-pointer"
+                      }`}
+                    >
+                      {busy ? "جارٍ الرفع..." : photo ? "📷 تغيير" : "📷 رفع صورة"}
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png"
+                        disabled={busy}
+                        className="hidden"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) void uploadTeamPhoto(team, f);
+                          e.target.value = "";
+                        }}
+                      />
+                    </label>
+                    {photo && (
+                      <button
+                        onClick={() => void deleteTeamPhoto(team)}
+                        className="px-2 py-2 rounded bg-red-900/60 hover:bg-red-700 text-white text-xs font-bold"
+                      >
+                        حذف
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          <p className="text-[10px] text-muted-foreground text-center mt-1">
+            JPG/PNG · حد أقصى 2MB · يتم القص دائرياً
+          </p>
+        </div>
+
         {/* ============ MUSIC PLAYER ============ */}
         <div className="rounded-2xl bg-card border-2 border-purple-700/40 p-3 shadow-lg">
           <div className="flex items-center justify-between mb-3">
