@@ -109,7 +109,26 @@ export default function FamilyFeud() {
     setTeam2Name(loadLS<string>(LS_TEAM2, "فريق 2"));
     setCustomCatalogs(loadLS<Catalog[]>(LS_CUSTOM_CATS, []));
     setHydrated(true);
+    // Load existing team photos from storage
+    (async () => {
+      const [p1, p2] = await Promise.all([signTeamPhoto(1), signTeamPhoto(2)]);
+      if (p1) setTeam1Photo(p1);
+      if (p2) setTeam2Photo(p2);
+    })();
   }, []);
+
+  // Animate score bumps
+  useEffect(() => {
+    if (!hydrated) return;
+    setScoreBump((b) => ({ ...b, t1: b.t1 + 1 }));
+  }, [team1Score, hydrated]);
+  useEffect(() => {
+    if (!hydrated) return;
+    setScoreBump((b) => ({ ...b, t2: b.t2 + 1 }));
+  }, [team2Score, hydrated]);
+
+  // dummy to preserve original closing brace line
+  useEffect(() => {
 
   useEffect(() => {
     if (!hydrated) return;
