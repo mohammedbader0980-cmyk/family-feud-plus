@@ -1341,7 +1341,7 @@ export default function FamilyFeud() {
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/80 pointer-events-none animate-fade-in">
           <div className="animate-scale-in">
             <TeamAvatar
-              team={winCelebrate}
+              team={winCelebrate as 1 | 2}
               name={winCelebrate === 1 ? team1Name : team2Name}
               photo={winCelebrate === 1 ? team1Photo : team2Photo}
               winning
