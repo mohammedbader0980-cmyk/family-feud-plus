@@ -1485,3 +1485,51 @@ function AnswerRow({
     </div>
   );
 }
+
+export function TeamAvatar({
+  team,
+  name,
+  photo,
+  winning,
+  bumpKey,
+  giant = false,
+}: {
+  team: 1 | 2;
+  name: string;
+  photo: string | null;
+  winning?: boolean;
+  bumpKey: number;
+  giant?: boolean;
+}) {
+  const sizeCls = giant
+    ? "w-56 h-56 md:w-72 md:h-72 text-7xl md:text-8xl border-8"
+    : "w-14 h-14 md:w-20 md:h-20 text-2xl md:text-3xl border-4";
+  const placeholderBg = team === 1 ? "bg-blue-600" : "bg-red-600";
+  const numeral = team === 1 ? "١" : "٢";
+  const glow = winning
+    ? "ring-4 ring-amber-400 shadow-[0_0_30px_rgba(251,191,36,0.85)] border-amber-300"
+    : "border-white/70";
+  return (
+    <div
+      key={bumpKey}
+      className={`${sizeCls} ${glow} rounded-full overflow-hidden flex items-center justify-center font-black text-white shadow-lg ${
+        bumpKey ? "animate-bounce" : ""
+      } ${photo ? "bg-black" : placeholderBg}`}
+      style={{ animationIterationCount: 2, animationDuration: "0.6s" }}
+      title={name}
+    >
+      {photo ? (
+        <img
+          src={photo}
+          alt={name}
+          className="w-full h-full object-cover"
+          onError={(e) => {
+            (e.currentTarget as HTMLImageElement).style.display = "none";
+          }}
+        />
+      ) : (
+        <span style={{ textShadow: "2px 2px 4px rgba(0,0,0,0.6)" }}>{numeral}</span>
+      )}
+    </div>
+  );
+}
