@@ -113,6 +113,83 @@ export default function FeudController() {
     }
   };
 
+  // ===== Team photo upload =====
+  const [photoUploading, setPhotoUploading] = useState<0 | 1 | 2>(0);
+
+  const cropToSquareJpeg = (file: File): Promise<Blob> =>
+    new Promise((resolve, reject) => {
+      const img = new Image();
+      const reader = new FileReader();
+      reader.onload = () => {
+        img.onload = () => {
+          const size = Math.min(img.width, img.height);
+          const sx = (img.width - size) / 2;
+          const sy = (img.height - size) / 2;
+          const target = Math.min(512, size);
+          const canvas = document.createElement("canvas");
+          canvas.width = target;
+          canvas.height = target;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) return reject(new Error("canvas"));
+          ctx.drawImage(img, sx, sy, size, size, 0, 0, target, target);
+          canvas.toBlob(
+            (b) => (b ? resolve(b) : reject(new Error("toBlob failed"))),
+            "image/jpeg",
+            0.9,
+          );
+        };
+        img.onerror = () => reject(new Error("image load"));
+        img.src = reader.result as string;
+      };
+      reader.onerror = () => reject(new Error("file read"));
+      reader.readAsDataURL(file);
+    });
+
+  const uploadTeamPhoto = async (team: 1 | 2, file: File) => {
+    if (!/^image\/(jpe?g|png)$/i.test(file.type)) {
+      alert("الصورة يجب أن تكون JPG أو PNG");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      alert("حجم الصورة يجب أن يكون أقل من 2 ميجابايت");
+      return;
+    }
+    setPhotoUploading(team);
+    try {
+      const cropped = await cropToSquareJpeg(file);
+      const path = `team${team}.jpg`;
+      const { error } = await supabase.storage
+        .from(PHOTO_BUCKET)
+        .upload(path, cropped, { contentType: "image/jpeg", upsert: true });
+      if (error) {
+        console.error(error);
+        alert("تعذّر رفع الصورة: " + error.message);
+        return;
+      }
+      const { data: signed } = await supabase.storage
+        .from(PHOTO_BUCKET)
+        .createSignedUrl(path, 60 * 60 * 24 * 365);
+      if (signed?.signedUrl) {
+        send({
+          action: "SET_TEAM_PHOTO",
+          payload: { team, url: `${signed.signedUrl}&v=${Date.now()}` },
+        });
+      }
+    } catch (e) {
+      console.error(e);
+      alert("فشل تجهيز الصورة");
+    } finally {
+      setPhotoUploading(0);
+    }
+  };
+
+  const deleteTeamPhoto = async (team: 1 | 2) => {
+    if (!window.confirm("حذف صورة الفريق؟")) return;
+    await supabase.storage.from(PHOTO_BUCKET).remove([`team${team}.jpg`]);
+    send({ action: "SET_TEAM_PHOTO", payload: { team, url: null } });
+  };
+
+
   return (
     <div className="min-h-screen bg-background text-foreground p-3 pb-10" dir="rtl">
       <div className="max-w-[480px] mx-auto flex flex-col gap-3">
