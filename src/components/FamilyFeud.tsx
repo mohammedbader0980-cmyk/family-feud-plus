@@ -1080,8 +1080,15 @@ export default function FamilyFeud() {
           </div>
 
           {/* Team 1 (right) */}
-          <div className="absolute -right-6 md:-right-12 top-1/2 -translate-y-1/2 z-30 flex flex-col">
-            <div className="side-score w-16 h-20 md:w-28 md:h-32 flex items-center justify-center">
+          <div className="absolute -right-6 md:-right-12 top-1/2 -translate-y-1/2 z-30 flex flex-col items-center">
+            <TeamAvatar
+              team={1}
+              name={team1Name}
+              photo={team1Photo}
+              winning={team1Score > team2Score}
+              bumpKey={scoreBump.t1}
+            />
+            <div className="side-score w-16 h-20 md:w-28 md:h-32 flex items-center justify-center mt-1">
               <span className="text-white text-3xl md:text-5xl font-bold drop-shadow-md">
                 {team1Score}
               </span>
@@ -1101,8 +1108,15 @@ export default function FamilyFeud() {
           </div>
 
           {/* Team 2 (left) */}
-          <div className="absolute -left-6 md:-left-12 top-1/2 -translate-y-1/2 z-30 flex flex-col">
-            <div className="side-score w-16 h-20 md:w-28 md:h-32 flex items-center justify-center">
+          <div className="absolute -left-6 md:-left-12 top-1/2 -translate-y-1/2 z-30 flex flex-col items-center">
+            <TeamAvatar
+              team={2}
+              name={team2Name}
+              photo={team2Photo}
+              winning={team2Score > team1Score}
+              bumpKey={scoreBump.t2}
+            />
+            <div className="side-score w-16 h-20 md:w-28 md:h-32 flex items-center justify-center mt-1">
               <span className="text-white text-3xl md:text-5xl font-bold drop-shadow-md">
                 {team2Score}
               </span>
@@ -1120,6 +1134,7 @@ export default function FamilyFeud() {
               </span>
             </button>
           </div>
+
 
           {/* Board */}
           <div className="board-inner w-full flex flex-col relative z-20 mt-6 md:mt-4 px-2 py-4 md:p-6">
