@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 type State = DisplayState["payload"];
 
 const MUSIC_BUCKET = "feud-music";
+const PHOTO_BUCKET = "team-photos";
 
 const defaultState: State = {
   currentQIndex: 0,
