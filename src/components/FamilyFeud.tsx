@@ -339,9 +339,16 @@ export default function FamilyFeud() {
   };
   const award = (team: 1 | 2) => {
     if (roundPoints === 0) return;
-    if (team === 1) setTeam1Score((s) => s + roundPoints);
-    else setTeam2Score((s) => s + roundPoints);
+    if (team === 1) {
+      setTeam1Score((s) => s + roundPoints);
+      setScoreBump((b) => ({ ...b, t1: b.t1 + 1 }));
+    } else {
+      setTeam2Score((s) => s + roundPoints);
+      setScoreBump((b) => ({ ...b, t2: b.t2 + 1 }));
+    }
     playWin();
+    setWinCelebrate(team);
+    window.setTimeout(() => setWinCelebrate(0), 2200);
     setRoundPoints(0);
     setStrikes(0);
   };
