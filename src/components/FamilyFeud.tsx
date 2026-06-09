@@ -1337,6 +1337,24 @@ export default function FamilyFeud() {
         </div>
       )}
 
+      {winCelebrate > 0 && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/80 pointer-events-none animate-fade-in">
+          <div className="animate-scale-in">
+            <TeamAvatar
+              team={winCelebrate}
+              name={winCelebrate === 1 ? team1Name : team2Name}
+              photo={winCelebrate === 1 ? team1Photo : team2Photo}
+              winning
+              bumpKey={0}
+              giant
+            />
+          </div>
+          <div className="mt-6 text-5xl md:text-7xl font-black text-amber-400 drop-shadow-[0_4px_8px_rgba(0,0,0,0.9)]">
+            🏆 {winCelebrate === 1 ? team1Name : team2Name}
+          </div>
+        </div>
+      )}
+
       {/* Hidden audio element for background music */}
       {tracks.length > 0 && (
         <audio
