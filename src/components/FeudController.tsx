@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 type State = DisplayState["payload"];
 
 const MUSIC_BUCKET = "feud-music";
+const PHOTO_BUCKET = "team-photos";
 
 const defaultState: State = {
   currentQIndex: 0,
@@ -27,6 +28,8 @@ const defaultState: State = {
   tracks: [],
   currentTrackId: null,
   onGameScreen: false,
+  team1Photo: null,
+  team2Photo: null,
 };
 
 const btnBase =
@@ -109,6 +112,83 @@ export default function FeudController() {
       pressTimer.current = null;
     }
   };
+
+  // ===== Team photo upload =====
+  const [photoUploading, setPhotoUploading] = useState<0 | 1 | 2>(0);
+
+  const cropToSquareJpeg = (file: File): Promise<Blob> =>
+    new Promise((resolve, reject) => {
+      const img = new Image();
+      const reader = new FileReader();
+      reader.onload = () => {
+        img.onload = () => {
+          const size = Math.min(img.width, img.height);
+          const sx = (img.width - size) / 2;
+          const sy = (img.height - size) / 2;
+          const target = Math.min(512, size);
+          const canvas = document.createElement("canvas");
+          canvas.width = target;
+          canvas.height = target;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) return reject(new Error("canvas"));
+          ctx.drawImage(img, sx, sy, size, size, 0, 0, target, target);
+          canvas.toBlob(
+            (b) => (b ? resolve(b) : reject(new Error("toBlob failed"))),
+            "image/jpeg",
+            0.9,
+          );
+        };
+        img.onerror = () => reject(new Error("image load"));
+        img.src = reader.result as string;
+      };
+      reader.onerror = () => reject(new Error("file read"));
+      reader.readAsDataURL(file);
+    });
+
+  const uploadTeamPhoto = async (team: 1 | 2, file: File) => {
+    if (!/^image\/(jpe?g|png)$/i.test(file.type)) {
+      alert("الصورة يجب أن تكون JPG أو PNG");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      alert("حجم الصورة يجب أن يكون أقل من 2 ميجابايت");
+      return;
+    }
+    setPhotoUploading(team);
+    try {
+      const cropped = await cropToSquareJpeg(file);
+      const path = `team${team}.jpg`;
+      const { error } = await supabase.storage
+        .from(PHOTO_BUCKET)
+        .upload(path, cropped, { contentType: "image/jpeg", upsert: true });
+      if (error) {
+        console.error(error);
+        alert("تعذّر رفع الصورة: " + error.message);
+        return;
+      }
+      const { data: signed } = await supabase.storage
+        .from(PHOTO_BUCKET)
+        .createSignedUrl(path, 60 * 60 * 24 * 365);
+      if (signed?.signedUrl) {
+        send({
+          action: "SET_TEAM_PHOTO",
+          payload: { team, url: `${signed.signedUrl}&v=${Date.now()}` },
+        });
+      }
+    } catch (e) {
+      console.error(e);
+      alert("فشل تجهيز الصورة");
+    } finally {
+      setPhotoUploading(0);
+    }
+  };
+
+  const deleteTeamPhoto = async (team: 1 | 2) => {
+    if (!window.confirm("حذف صورة الفريق؟")) return;
+    await supabase.storage.from(PHOTO_BUCKET).remove([`team${team}.jpg`]);
+    send({ action: "SET_TEAM_PHOTO", payload: { team, url: null } });
+  };
+
 
   return (
     <div className="min-h-screen bg-background text-foreground p-3 pb-10" dir="rtl">
@@ -328,6 +408,72 @@ export default function FeudController() {
               </button>
             </div>
           </div>
+        </div>
+
+        {/* ============ TEAM PHOTOS ============ */}
+        <div className="rounded-2xl bg-card border-2 border-blue-700/40 p-3 shadow-lg">
+          <h3 className="text-sm font-bold text-blue-300 mb-3">👥 إعدادات الفرق</h3>
+          {([1, 2] as const).map((team) => {
+            const photo = team === 1 ? state.team1Photo : state.team2Photo;
+            const tname = team === 1 ? state.team1Name : state.team2Name;
+            const placeholderBg = team === 1 ? "bg-blue-600" : "bg-red-600";
+            const numeral = team === 1 ? "١" : "٢";
+            const busy = photoUploading === team;
+            return (
+              <div
+                key={team}
+                className="flex items-center gap-3 p-2 mb-2 rounded-lg bg-secondary/40 border border-border"
+              >
+                <div
+                  className={`w-16 h-16 rounded-full overflow-hidden border-2 border-white/70 flex items-center justify-center font-black text-white text-2xl shadow ${
+                    photo ? "bg-black" : placeholderBg
+                  }`}
+                >
+                  {photo ? (
+                    <img src={photo} alt={tname} className="w-full h-full object-cover" />
+                  ) : (
+                    <span>{numeral}</span>
+                  )}
+                </div>
+                <div className="flex-1">
+                  <div className="text-sm font-bold truncate mb-1">{tname}</div>
+                  <div className="flex gap-1.5">
+                    <label
+                      className={`flex-1 text-center px-2 py-2 rounded font-bold text-white text-xs ${
+                        busy
+                          ? "bg-gray-600 cursor-wait"
+                          : "bg-blue-700 hover:bg-blue-600 active:scale-95 cursor-pointer"
+                      }`}
+                    >
+                      {busy ? "جارٍ الرفع..." : photo ? "📷 تغيير" : "📷 رفع صورة"}
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png"
+                        disabled={busy}
+                        className="hidden"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) void uploadTeamPhoto(team, f);
+                          e.target.value = "";
+                        }}
+                      />
+                    </label>
+                    {photo && (
+                      <button
+                        onClick={() => void deleteTeamPhoto(team)}
+                        className="px-2 py-2 rounded bg-red-900/60 hover:bg-red-700 text-white text-xs font-bold"
+                      >
+                        حذف
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          <p className="text-[10px] text-muted-foreground text-center mt-1">
+            JPG/PNG · حد أقصى 2MB · يتم القص دائرياً
+          </p>
         </div>
 
         {/* ============ MUSIC PLAYER ============ */}

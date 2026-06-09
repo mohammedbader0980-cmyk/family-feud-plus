@@ -28,7 +28,8 @@ export type ControllerAction =
   | { action: "SET_VOLUME"; payload: { value: number } }
   | { action: "TOGGLE_LOOP" }
   | { action: "DELETE_TRACK"; payload: { id: string } }
-  | { action: "TRACKS_UPDATED" };
+  | { action: "TRACKS_UPDATED" }
+  | { action: "SET_TEAM_PHOTO"; payload: { team: 1 | 2; url: string | null } };
 
 export type DisplayState = {
   action: "STATE";
@@ -53,6 +54,8 @@ export type DisplayState = {
     tracks: { id: string; name: string }[];
     currentTrackId: string | null;
     onGameScreen: boolean;
+    team1Photo: string | null;
+    team2Photo: string | null;
   };
 };
 

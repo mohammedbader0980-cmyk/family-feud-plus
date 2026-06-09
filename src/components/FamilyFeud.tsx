@@ -25,6 +25,19 @@ type Track = {
 };
 
 const MUSIC_BUCKET = "feud-music";
+const PHOTO_BUCKET = "team-photos";
+
+const teamPhotoFile = (team: 1 | 2) => `team${team}.jpg`;
+const signTeamPhoto = async (team: 1 | 2): Promise<string | null> => {
+  try {
+    const { data } = await supabase.storage
+      .from(PHOTO_BUCKET)
+      .createSignedUrl(teamPhotoFile(team), 60 * 60 * 24 * 365);
+    return data?.signedUrl ?? null;
+  } catch {
+    return null;
+  }
+};
 
 const loadStorageTracks = async (): Promise<Track[]> => {
   try {
@@ -83,6 +96,10 @@ export default function FamilyFeud() {
   const [team1Name, setTeam1Name] = useState<string>("فريق 1");
   const [team2Name, setTeam2Name] = useState<string>("فريق 2");
   const [customCatalogs, setCustomCatalogs] = useState<Catalog[]>([]);
+  const [team1Photo, setTeam1Photo] = useState<string | null>(null);
+  const [team2Photo, setTeam2Photo] = useState<string | null>(null);
+  const [winCelebrate, setWinCelebrate] = useState<1 | 2 | 0>(0);
+  const [scoreBump, setScoreBump] = useState<{ t1: number; t2: number }>({ t1: 0, t2: 0 });
   const [hydrated, setHydrated] = useState(false);
 
   // Load persisted state from localStorage AFTER mount (avoid SSR overwriting)
@@ -92,7 +109,16 @@ export default function FamilyFeud() {
     setTeam2Name(loadLS<string>(LS_TEAM2, "فريق 2"));
     setCustomCatalogs(loadLS<Catalog[]>(LS_CUSTOM_CATS, []));
     setHydrated(true);
+    // Load existing team photos from storage
+    (async () => {
+      const [p1, p2] = await Promise.all([signTeamPhoto(1), signTeamPhoto(2)]);
+      if (p1) setTeam1Photo(p1);
+      if (p2) setTeam2Photo(p2);
+    })();
   }, []);
+
+
+
 
   useEffect(() => {
     if (!hydrated) return;
@@ -313,9 +339,16 @@ export default function FamilyFeud() {
   };
   const award = (team: 1 | 2) => {
     if (roundPoints === 0) return;
-    if (team === 1) setTeam1Score((s) => s + roundPoints);
-    else setTeam2Score((s) => s + roundPoints);
+    if (team === 1) {
+      setTeam1Score((s) => s + roundPoints);
+      setScoreBump((b) => ({ ...b, t1: b.t1 + 1 }));
+    } else {
+      setTeam2Score((s) => s + roundPoints);
+      setScoreBump((b) => ({ ...b, t2: b.t2 + 1 }));
+    }
     playWin();
+    setWinCelebrate(team);
+    window.setTimeout(() => setWinCelebrate(0), 2200);
     setRoundPoints(0);
     setStrikes(0);
   };
@@ -446,6 +479,8 @@ export default function FamilyFeud() {
       tracks: tracks.map((t) => ({ id: t.id, name: t.name })),
       currentTrackId,
       onGameScreen: screen === "game",
+      team1Photo,
+      team2Photo,
     };
   };
 
@@ -471,6 +506,8 @@ export default function FamilyFeud() {
     tracks,
     currentTrackId,
     screen,
+    team1Photo,
+    team2Photo,
   ]);
 
   // Subscribe to controller actions
@@ -564,6 +601,11 @@ export default function FamilyFeud() {
         case "TRACKS_UPDATED":
           void h.refreshTracks();
           break;
+        case "SET_TEAM_PHOTO": {
+          const setter = msg.payload.team === 1 ? setTeam1Photo : setTeam2Photo;
+          setter(msg.payload.url);
+          break;
+        }
       }
     });
     return off;
@@ -1038,8 +1080,15 @@ export default function FamilyFeud() {
           </div>
 
           {/* Team 1 (right) */}
-          <div className="absolute -right-6 md:-right-12 top-1/2 -translate-y-1/2 z-30 flex flex-col">
-            <div className="side-score w-16 h-20 md:w-28 md:h-32 flex items-center justify-center">
+          <div className="absolute -right-6 md:-right-12 top-1/2 -translate-y-1/2 z-30 flex flex-col items-center">
+            <TeamAvatar
+              team={1}
+              name={team1Name}
+              photo={team1Photo}
+              winning={team1Score > team2Score}
+              bumpKey={scoreBump.t1}
+            />
+            <div className="side-score w-16 h-20 md:w-28 md:h-32 flex items-center justify-center mt-1">
               <span className="text-white text-3xl md:text-5xl font-bold drop-shadow-md">
                 {team1Score}
               </span>
@@ -1059,8 +1108,15 @@ export default function FamilyFeud() {
           </div>
 
           {/* Team 2 (left) */}
-          <div className="absolute -left-6 md:-left-12 top-1/2 -translate-y-1/2 z-30 flex flex-col">
-            <div className="side-score w-16 h-20 md:w-28 md:h-32 flex items-center justify-center">
+          <div className="absolute -left-6 md:-left-12 top-1/2 -translate-y-1/2 z-30 flex flex-col items-center">
+            <TeamAvatar
+              team={2}
+              name={team2Name}
+              photo={team2Photo}
+              winning={team2Score > team1Score}
+              bumpKey={scoreBump.t2}
+            />
+            <div className="side-score w-16 h-20 md:w-28 md:h-32 flex items-center justify-center mt-1">
               <span className="text-white text-3xl md:text-5xl font-bold drop-shadow-md">
                 {team2Score}
               </span>
@@ -1078,6 +1134,7 @@ export default function FamilyFeud() {
               </span>
             </button>
           </div>
+
 
           {/* Board */}
           <div className="board-inner w-full flex flex-col relative z-20 mt-6 md:mt-4 px-2 py-4 md:p-6">
@@ -1280,6 +1337,24 @@ export default function FamilyFeud() {
         </div>
       )}
 
+      {winCelebrate > 0 && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/80 pointer-events-none animate-fade-in">
+          <div className="animate-scale-in">
+            <TeamAvatar
+              team={winCelebrate as 1 | 2}
+              name={winCelebrate === 1 ? team1Name : team2Name}
+              photo={winCelebrate === 1 ? team1Photo : team2Photo}
+              winning
+              bumpKey={0}
+              giant
+            />
+          </div>
+          <div className="mt-6 text-5xl md:text-7xl font-black text-amber-400 drop-shadow-[0_4px_8px_rgba(0,0,0,0.9)]">
+            🏆 {winCelebrate === 1 ? team1Name : team2Name}
+          </div>
+        </div>
+      )}
+
       {/* Hidden audio element for background music */}
       {tracks.length > 0 && (
         <audio
@@ -1406,6 +1481,54 @@ function AnswerRow({
             {index + 1}
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+export function TeamAvatar({
+  team,
+  name,
+  photo,
+  winning,
+  bumpKey,
+  giant = false,
+}: {
+  team: 1 | 2;
+  name: string;
+  photo: string | null;
+  winning?: boolean;
+  bumpKey: number;
+  giant?: boolean;
+}) {
+  const sizeCls = giant
+    ? "w-56 h-56 md:w-72 md:h-72 text-7xl md:text-8xl border-8"
+    : "w-14 h-14 md:w-20 md:h-20 text-2xl md:text-3xl border-4";
+  const placeholderBg = team === 1 ? "bg-blue-600" : "bg-red-600";
+  const numeral = team === 1 ? "١" : "٢";
+  const glow = winning
+    ? "ring-4 ring-amber-400 shadow-[0_0_30px_rgba(251,191,36,0.85)] border-amber-300"
+    : "border-white/70";
+  return (
+    <div
+      key={bumpKey}
+      className={`${sizeCls} ${glow} rounded-full overflow-hidden flex items-center justify-center font-black text-white shadow-lg ${
+        bumpKey ? "animate-bounce" : ""
+      } ${photo ? "bg-black" : placeholderBg}`}
+      style={{ animationIterationCount: 2, animationDuration: "0.6s" }}
+      title={name}
+    >
+      {photo ? (
+        <img
+          src={photo}
+          alt={name}
+          className="w-full h-full object-cover"
+          onError={(e) => {
+            (e.currentTarget as HTMLImageElement).style.display = "none";
+          }}
+        />
+      ) : (
+        <span style={{ textShadow: "2px 2px 4px rgba(0,0,0,0.6)" }}>{numeral}</span>
       )}
     </div>
   );
