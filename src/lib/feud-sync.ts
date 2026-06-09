@@ -54,6 +54,8 @@ export type DisplayState = {
     tracks: { id: string; name: string }[];
     currentTrackId: string | null;
     onGameScreen: boolean;
+    team1Photo: string | null;
+    team2Photo: string | null;
   };
 };
 
