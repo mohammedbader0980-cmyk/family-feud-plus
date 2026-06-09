@@ -25,6 +25,19 @@ type Track = {
 };
 
 const MUSIC_BUCKET = "feud-music";
+const PHOTO_BUCKET = "team-photos";
+
+const teamPhotoFile = (team: 1 | 2) => `team${team}.jpg`;
+const signTeamPhoto = async (team: 1 | 2): Promise<string | null> => {
+  try {
+    const { data } = await supabase.storage
+      .from(PHOTO_BUCKET)
+      .createSignedUrl(teamPhotoFile(team), 60 * 60 * 24 * 365);
+    return data?.signedUrl ?? null;
+  } catch {
+    return null;
+  }
+};
 
 const loadStorageTracks = async (): Promise<Track[]> => {
   try {
