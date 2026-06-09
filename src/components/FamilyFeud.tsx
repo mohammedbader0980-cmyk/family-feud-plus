@@ -96,6 +96,10 @@ export default function FamilyFeud() {
   const [team1Name, setTeam1Name] = useState<string>("فريق 1");
   const [team2Name, setTeam2Name] = useState<string>("فريق 2");
   const [customCatalogs, setCustomCatalogs] = useState<Catalog[]>([]);
+  const [team1Photo, setTeam1Photo] = useState<string | null>(null);
+  const [team2Photo, setTeam2Photo] = useState<string | null>(null);
+  const [winCelebrate, setWinCelebrate] = useState<1 | 2 | 0>(0);
+  const [scoreBump, setScoreBump] = useState<{ t1: number; t2: number }>({ t1: 0, t2: 0 });
   const [hydrated, setHydrated] = useState(false);
 
   // Load persisted state from localStorage AFTER mount (avoid SSR overwriting)
