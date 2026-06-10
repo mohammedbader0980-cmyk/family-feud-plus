@@ -1,11 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { sendMessage, subscribe, type DisplayState, type SyncMessage } from "@/lib/feud-sync";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  uploadTeamPhoto as uploadTeamPhotoLib,
+  deleteTeamPhoto as deleteTeamPhotoLib,
+  TeamPhotoError,
+} from "@/lib/team-photo-upload";
 
 type State = DisplayState["payload"];
 
 const MUSIC_BUCKET = "feud-music";
-const PHOTO_BUCKET = "team-photos";
 
 const defaultState: State = {
   currentQIndex: 0,
