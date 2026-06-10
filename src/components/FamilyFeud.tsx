@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { premadeCatalogs, emptyQuestion, type Question, type Catalog } from "@/data/catalogs";
 import {
   playDing,
@@ -15,6 +16,10 @@ import {
 } from "@/lib/music-db";
 import { sendMessage, subscribe, type SyncMessage } from "@/lib/feud-sync";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  uploadTeamPhoto as uploadTeamPhotoLib,
+  TeamPhotoError,
+} from "@/lib/team-photo-upload";
 
 type Track = {
   id: string;
