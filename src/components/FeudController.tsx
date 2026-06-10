@@ -447,7 +447,7 @@ export default function FeudController() {
             );
           })}
           <p className="text-[10px] text-muted-foreground text-center mt-1">
-            JPG/PNG · حد أقصى 2MB · يتم القص دائرياً
+            JPG/PNG · حد أقصى 2MB · يتم القص دائرياً · يمكن السحب والإفلات
           </p>
         </div>
 
