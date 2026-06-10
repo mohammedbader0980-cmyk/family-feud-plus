@@ -1185,6 +1185,7 @@ export default function FamilyFeud() {
   // ============ Game ============
   return (
     <div className="min-h-screen flex flex-col font-sans overflow-hidden bg-[#051024]" dir="rtl">
+      {dragDropOverlay}
       <div
         className="flex-1 relative flex items-center justify-center p-2 md:p-6"
         style={{
