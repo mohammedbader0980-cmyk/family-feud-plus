@@ -370,10 +370,34 @@ export default function FeudController() {
             const placeholderBg = team === 1 ? "bg-blue-600" : "bg-red-600";
             const numeral = team === 1 ? "١" : "٢";
             const busy = photoUploading === team;
+            const dragOver = dragOverTeam === team;
             return (
               <div
                 key={team}
-                className="flex items-center gap-3 p-2 mb-2 rounded-lg bg-secondary/40 border border-border"
+                onDragEnter={(e) => {
+                  e.preventDefault();
+                  setDragOverTeam(team);
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "copy";
+                  if (dragOverTeam !== team) setDragOverTeam(team);
+                }}
+                onDragLeave={(e) => {
+                  e.preventDefault();
+                  setDragOverTeam(0);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragOverTeam(0);
+                  const f = e.dataTransfer.files?.[0];
+                  if (f && !busy) void uploadTeamPhoto(team, f);
+                }}
+                className={`flex items-center gap-3 p-2 mb-2 rounded-lg bg-secondary/40 border-2 transition-colors ${
+                  dragOver
+                    ? "border-dashed border-blue-400 bg-blue-500/10"
+                    : "border-border"
+                }`}
               >
                 <div
                   className={`w-16 h-16 rounded-full overflow-hidden border-2 border-white/70 flex items-center justify-center font-black text-white text-2xl shadow ${
