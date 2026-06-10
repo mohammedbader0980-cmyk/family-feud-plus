@@ -843,6 +843,7 @@ export default function FamilyFeud() {
   if (screen === "host") {
     return (
       <div className="min-h-screen bg-host text-white p-4 md:p-8" dir="rtl">
+        {dragDropOverlay}
         <div className="max-w-5xl mx-auto flex justify-between items-center mb-6 flex-wrap gap-3">
           <button
             onClick={() => setScreen("start")}
