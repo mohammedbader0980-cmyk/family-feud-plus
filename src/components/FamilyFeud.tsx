@@ -807,6 +807,7 @@ export default function FamilyFeud() {
   if (screen === "start") {
     return (
       <div className="min-h-screen bg-dots-start flex flex-col items-center justify-center p-4" dir="rtl">
+        {dragDropOverlay}
         <div className="relative flex flex-col items-center justify-center mb-16 md:scale-125">
           <div className="w-[340px] h-[180px] md:w-[540px] md:h-[270px] bg-gradient-to-b from-[#4774d6] to-[#1d4199] rounded-[100%] border-[4px] md:border-[6px] border-white shadow-[0_0_20px_rgba(0,0,0,0.8),inset_0_0_30px_rgba(0,0,0,0.5)] flex flex-col items-center justify-center relative z-10 outline outline-4 outline-[#dca34b]">
             <h1 className="logo-text text-[44px] md:text-[78px] leading-[1.1] text-center whitespace-nowrap">
