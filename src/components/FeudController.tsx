@@ -1,11 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { sendMessage, subscribe, type DisplayState, type SyncMessage } from "@/lib/feud-sync";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  uploadTeamPhoto as uploadTeamPhotoLib,
+  deleteTeamPhoto as deleteTeamPhotoLib,
+  TeamPhotoError,
+} from "@/lib/team-photo-upload";
 
 type State = DisplayState["payload"];
 
 const MUSIC_BUCKET = "feud-music";
-const PHOTO_BUCKET = "team-photos";
 
 const defaultState: State = {
   currentQIndex: 0,
@@ -115,69 +119,15 @@ export default function FeudController() {
 
   // ===== Team photo upload =====
   const [photoUploading, setPhotoUploading] = useState<0 | 1 | 2>(0);
-
-  const cropToSquareJpeg = (file: File): Promise<Blob> =>
-    new Promise((resolve, reject) => {
-      const img = new Image();
-      const reader = new FileReader();
-      reader.onload = () => {
-        img.onload = () => {
-          const size = Math.min(img.width, img.height);
-          const sx = (img.width - size) / 2;
-          const sy = (img.height - size) / 2;
-          const target = Math.min(512, size);
-          const canvas = document.createElement("canvas");
-          canvas.width = target;
-          canvas.height = target;
-          const ctx = canvas.getContext("2d");
-          if (!ctx) return reject(new Error("canvas"));
-          ctx.drawImage(img, sx, sy, size, size, 0, 0, target, target);
-          canvas.toBlob(
-            (b) => (b ? resolve(b) : reject(new Error("toBlob failed"))),
-            "image/jpeg",
-            0.9,
-          );
-        };
-        img.onerror = () => reject(new Error("image load"));
-        img.src = reader.result as string;
-      };
-      reader.onerror = () => reject(new Error("file read"));
-      reader.readAsDataURL(file);
-    });
+  const [dragOverTeam, setDragOverTeam] = useState<0 | 1 | 2>(0);
 
   const uploadTeamPhoto = async (team: 1 | 2, file: File) => {
-    if (!/^image\/(jpe?g|png)$/i.test(file.type)) {
-      alert("الصورة يجب أن تكون JPG أو PNG");
-      return;
-    }
-    if (file.size > 2 * 1024 * 1024) {
-      alert("حجم الصورة يجب أن يكون أقل من 2 ميجابايت");
-      return;
-    }
     setPhotoUploading(team);
     try {
-      const cropped = await cropToSquareJpeg(file);
-      const path = `team${team}.jpg`;
-      const { error } = await supabase.storage
-        .from(PHOTO_BUCKET)
-        .upload(path, cropped, { contentType: "image/jpeg", upsert: true });
-      if (error) {
-        console.error(error);
-        alert("تعذّر رفع الصورة: " + error.message);
-        return;
-      }
-      const { data: signed } = await supabase.storage
-        .from(PHOTO_BUCKET)
-        .createSignedUrl(path, 60 * 60 * 24 * 365);
-      if (signed?.signedUrl) {
-        send({
-          action: "SET_TEAM_PHOTO",
-          payload: { team, url: `${signed.signedUrl}&v=${Date.now()}` },
-        });
-      }
+      await uploadTeamPhotoLib(team, file);
     } catch (e) {
       console.error(e);
-      alert("فشل تجهيز الصورة");
+      alert(e instanceof TeamPhotoError ? e.message : "فشل رفع الصورة");
     } finally {
       setPhotoUploading(0);
     }
@@ -185,9 +135,10 @@ export default function FeudController() {
 
   const deleteTeamPhoto = async (team: 1 | 2) => {
     if (!window.confirm("حذف صورة الفريق؟")) return;
-    await supabase.storage.from(PHOTO_BUCKET).remove([`team${team}.jpg`]);
-    send({ action: "SET_TEAM_PHOTO", payload: { team, url: null } });
+    await deleteTeamPhotoLib(team);
   };
+
+
 
 
   return (
@@ -419,10 +370,34 @@ export default function FeudController() {
             const placeholderBg = team === 1 ? "bg-blue-600" : "bg-red-600";
             const numeral = team === 1 ? "١" : "٢";
             const busy = photoUploading === team;
+            const dragOver = dragOverTeam === team;
             return (
               <div
                 key={team}
-                className="flex items-center gap-3 p-2 mb-2 rounded-lg bg-secondary/40 border border-border"
+                onDragEnter={(e) => {
+                  e.preventDefault();
+                  setDragOverTeam(team);
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "copy";
+                  if (dragOverTeam !== team) setDragOverTeam(team);
+                }}
+                onDragLeave={(e) => {
+                  e.preventDefault();
+                  setDragOverTeam(0);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragOverTeam(0);
+                  const f = e.dataTransfer.files?.[0];
+                  if (f && !busy) void uploadTeamPhoto(team, f);
+                }}
+                className={`flex items-center gap-3 p-2 mb-2 rounded-lg bg-secondary/40 border-2 transition-colors ${
+                  dragOver
+                    ? "border-dashed border-blue-400 bg-blue-500/10"
+                    : "border-border"
+                }`}
               >
                 <div
                   className={`w-16 h-16 rounded-full overflow-hidden border-2 border-white/70 flex items-center justify-center font-black text-white text-2xl shadow ${
@@ -472,7 +447,7 @@ export default function FeudController() {
             );
           })}
           <p className="text-[10px] text-muted-foreground text-center mt-1">
-            JPG/PNG · حد أقصى 2MB · يتم القص دائرياً
+            JPG/PNG · حد أقصى 2MB · يتم القص دائرياً · يمكن السحب والإفلات
           </p>
         </div>
 

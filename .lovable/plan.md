@@ -1,47 +1,41 @@
-## Team Avatars / Photos
+## الخطة: سحب وإفلات صور الفرق (Drag & Drop) على الشاشتين
 
-Add team photo support that uploads from the controller, syncs over Realtime, and renders on the main display.
+نظام رفع الصور موجود حالياً في `/controller`. سأضيف دعم السحب والإفلات في المكانين المطلوبين، مع إعادة استخدام نفس منطق الرفع (Supabase Storage + بث Realtime عبر `SET_TEAM_PHOTO`).
 
-### Storage
-- New public Supabase bucket `team-photos` (public read).
-- RLS policies on `storage.objects` allowing public select + anonymous insert/update/delete scoped to bucket `team-photos` (matches existing `feud-music` open model — no auth in app).
-- File naming: fixed slots `team1.jpg` and `team2.jpg` with `upsert: true` so a new upload replaces the old. Append `?v=timestamp` cache-buster to URLs so the display refreshes instantly.
+---
 
-### State + Sync (`src/lib/feud-sync.ts`)
-- Extend `DisplayState.payload` with `team1Photo: string | null`, `team2Photo: string | null`.
-- New action `SET_TEAM_PHOTO { team: 1|2, url: string|null }` (controller → display, also broadcast back via STATE).
-- New action `CLEAR_TEAM_PHOTO { team: 1|2 }`.
+### 1) على وحدة التحكم `/controller` — `src/components/FeudController.tsx`
 
-### Main game (`src/components/FamilyFeud.tsx`)
-- Add `team1Photo` / `team2Photo` state, persisted in localStorage (URL only) and broadcast in STATE.
-- On mount, attempt to load existing photos from the bucket (`team1.jpg`, `team2.jpg`) via public URL with HEAD check, else null.
-- Handle `SET_TEAM_PHOTO` / `CLEAR_TEAM_PHOTO` from controller.
-- Score area: render a circular avatar (~64–80px on bar, larger in win screen) next to each team's score:
-  - If photo: `<img>` clipped to `rounded-full` with `object-cover`.
-  - If null: colored circle (team 1 = blue, team 2 = red) with Arabic numeral (`١` / `٢`).
-- Animations:
-  - `animate-bounce` (one-shot via key change) when that team's score increases.
-  - Gold glow ring (`ring-4 ring-amber-400 shadow-[0_0_24px_gold]`) on the team currently leading.
-- Win celebration screen: show giant avatar (e.g. 240px) of winning team.
+- إضافة منطقة إفلات حول دائرة كل فريق في قسم «إعدادات الفرق».
+- إضافة حالة `dragOverTeam: 0 | 1 | 2` لإظهار حلقة زرقاء متقطعة (`ring-4 ring-blue-500 ring-dashed`) عند السحب فوق الفريق.
+- معالجات:
+  - `onDragEnter` / `onDragOver` → `preventDefault()` + تحديث `dragOverTeam`.
+  - `onDragLeave` → مسح الحالة.
+  - `onDrop` → استخراج أول ملف من `e.dataTransfer.files` وتمريره إلى نفس دالة `uploadTeamPhoto` الحالية (نفس التحقق من النوع/الحجم).
+- زر «📷 رفع صورة» يبقى كما هو للهواتف (لا تدعم السحب).
 
-### Controller (`src/components/FeudController.tsx`)
-- New "إعدادات الفرق" card with two rows (one per team):
-  - Circle preview (photo or placeholder with first letter / numeral).
-  - "📷 رفع صورة" button → `<input type="file" accept="image/jpeg,image/png" capture="environment">`.
-  - "حذف" button when a photo exists.
-- Validation: reject >2MB or non-JPG/PNG with an Arabic alert.
-- Auto-crop to square before upload: draw to canvas at min(width,height) center-crop, export as JPEG quality 0.9. Circle clipping is purely a CSS display concern (`rounded-full overflow-hidden`), so we store a square JPEG.
-- Upload to `team-photos/team{1|2}.jpg` with `upsert: true`, then `send({ action: "SET_TEAM_PHOTO", payload: { team, url: publicUrl + "?v=" + Date.now() } })`.
+### 2) على الشاشة الرئيسية `/` — `src/components/FamilyFeud.tsx`
 
-### Placeholder component
-- Small shared inline helper (in `FamilyFeud.tsx` and `FeudController.tsx`) — no new file — renders either `<img>` or a colored circle with the team's marker. Team 1 placeholder: `bg-blue-600` + `١`. Team 2: `bg-red-600` + `٢`.
+- إضافة سحب وإفلات على مستوى صفحة العرض كاملة (للسماح للمضيف بسحب صورة من سطح المكتب على iPad/جهاز عرض).
+- عند الإفلات: عرض حوار صغير «أيّ فريق؟ → فريق 1 / فريق 2 / إلغاء» (لأن صورة قد تُسحب من أي مكان على الشاشة).
+- إعادة استخدام نفس منطق `cropToSquareJpeg` + رفع إلى bucket `team-photos` + بث `SET_TEAM_PHOTO` عبر `feudSync`.
+- نقل دالة الرفع/القص إلى ملف مشترك صغير `src/lib/team-photo-upload.ts` لتجنّب تكرار الكود بين الملفين.
 
-### Files touched
-- `supabase/migrations/<new>.sql` — bucket + storage.objects policies (public access).
-- `src/lib/feud-sync.ts` — new actions + state fields.
-- `src/components/FamilyFeud.tsx` — state, sync handlers, avatar rendering, win screen, animations, localStorage keys `feud.team1Photo` / `feud.team2Photo`.
-- `src/components/FeudController.tsx` — new team-settings card with upload/delete + canvas crop.
+### 3) ملف مشترك جديد — `src/lib/team-photo-upload.ts`
 
-### Out of scope
-- No per-session photo history (each team has a single slot, as requested).
-- No auth — bucket is public, matching current app posture.
+يصدّر:
+- `cropToSquareJpeg(file: File): Promise<Blob>`
+- `uploadTeamPhoto(team: 1 | 2, file: File): Promise<string>` — يتحقق من النوع (JPG/PNG) والحجم (≤2MB)، يقصّ، يرفع إلى Supabase Storage `team-photos/team{n}.jpg` مع `upsert`, يعيد رابط عام مع `?v=timestamp`، ثم يبثّ `SET_TEAM_PHOTO`.
+- يستخدمه كل من `FeudController.tsx` و`FamilyFeud.tsx`.
+
+### نطاق غير مشمول
+
+- لا تغييرات على القاعدة أو الـ bucket (موجود).
+- لا تغيير على منطق المزامنة، فقط استدعاء نفس الأكشن.
+- لا شريط تقدم ولا معرض صور جاهزة (لم تُطلب).
+
+### الملفات
+
+- `src/lib/team-photo-upload.ts` (جديد)
+- `src/components/FeudController.tsx` (إضافة handlers للسحب + استبدال منطق الرفع بالاستيراد من الملف المشترك)
+- `src/components/FamilyFeud.tsx` (إضافة drop overlay + حوار اختيار الفريق)

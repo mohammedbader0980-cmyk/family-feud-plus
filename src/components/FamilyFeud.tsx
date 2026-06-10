@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { premadeCatalogs, emptyQuestion, type Question, type Catalog } from "@/data/catalogs";
 import {
   playDing,
@@ -15,6 +16,10 @@ import {
 } from "@/lib/music-db";
 import { sendMessage, subscribe, type SyncMessage } from "@/lib/feud-sync";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  uploadTeamPhoto as uploadTeamPhotoLib,
+  TeamPhotoError,
+} from "@/lib/team-photo-upload";
 
 type Track = {
   id: string;
@@ -118,6 +123,125 @@ export default function FamilyFeud() {
   }, []);
 
 
+
+
+  // ===== Drag & drop team photo from desktop =====
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
+  const [pendingPhotoFile, setPendingPhotoFile] = useState<File | null>(null);
+  const [photoUploadBusy, setPhotoUploadBusy] = useState(false);
+
+  useEffect(() => {
+    let depth = 0;
+    const hasFile = (e: DragEvent) =>
+      Array.from(e.dataTransfer?.types || []).includes("Files");
+    const onEnter = (e: DragEvent) => {
+      if (!hasFile(e)) return;
+      depth++;
+      setIsDraggingFile(true);
+    };
+    const onOver = (e: DragEvent) => {
+      if (!hasFile(e)) return;
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+    };
+    const onLeave = (e: DragEvent) => {
+      if (!hasFile(e)) return;
+      depth = Math.max(0, depth - 1);
+      if (depth === 0) setIsDraggingFile(false);
+    };
+    const onDrop = (e: DragEvent) => {
+      if (!hasFile(e)) return;
+      e.preventDefault();
+      depth = 0;
+      setIsDraggingFile(false);
+      const f = e.dataTransfer?.files?.[0];
+      if (f) setPendingPhotoFile(f);
+    };
+    window.addEventListener("dragenter", onEnter);
+    window.addEventListener("dragover", onOver);
+    window.addEventListener("dragleave", onLeave);
+    window.addEventListener("drop", onDrop);
+    return () => {
+      window.removeEventListener("dragenter", onEnter);
+      window.removeEventListener("dragover", onOver);
+      window.removeEventListener("dragleave", onLeave);
+      window.removeEventListener("drop", onDrop);
+    };
+  }, []);
+
+  const handlePhotoDropChoice = async (team: 1 | 2) => {
+    if (!pendingPhotoFile) return;
+    const file = pendingPhotoFile;
+    setPhotoUploadBusy(true);
+    try {
+      const url = await uploadTeamPhotoLib(team, file);
+      if (team === 1) setTeam1Photo(url);
+      else setTeam2Photo(url);
+    } catch (e) {
+      alert(e instanceof TeamPhotoError ? e.message : "فشل رفع الصورة");
+    } finally {
+      setPhotoUploadBusy(false);
+      setPendingPhotoFile(null);
+    }
+  };
+
+  const dragDropOverlay =
+    typeof document !== "undefined" && (isDraggingFile || pendingPhotoFile)
+      ? createPortal(
+          <>
+            {isDraggingFile && !pendingPhotoFile && (
+              <div className="fixed inset-0 z-[9999] pointer-events-none flex items-center justify-center bg-blue-500/20 backdrop-blur-sm">
+                <div className="border-4 border-dashed border-white rounded-3xl px-12 py-10 text-white text-3xl font-bold bg-black/40 shadow-2xl">
+                  أفلت الصورة لرفعها 📸
+                </div>
+              </div>
+            )}
+            {pendingPhotoFile && (
+              <div
+                className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 p-4"
+                onClick={() => !photoUploadBusy && setPendingPhotoFile(null)}
+                dir="rtl"
+              >
+                <div
+                  className="bg-card border-2 border-blue-500 rounded-2xl p-6 max-w-sm w-full shadow-2xl"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <h3 className="text-xl font-bold text-center mb-2 text-foreground">
+                    تعيين الصورة لأي فريق؟
+                  </h3>
+                  <p className="text-xs text-center text-muted-foreground mb-4 truncate">
+                    {pendingPhotoFile.name}
+                  </p>
+                  <div className="flex gap-3">
+                    <button
+                      disabled={photoUploadBusy}
+                      onClick={() => void handlePhotoDropChoice(1)}
+                      className="flex-1 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold disabled:opacity-50"
+                    >
+                      {team1Name}
+                    </button>
+                    <button
+                      disabled={photoUploadBusy}
+                      onClick={() => void handlePhotoDropChoice(2)}
+                      className="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold disabled:opacity-50"
+                    >
+                      {team2Name}
+                    </button>
+                  </div>
+                  <button
+                    disabled={photoUploadBusy}
+                    onClick={() => setPendingPhotoFile(null)}
+                    className="w-full mt-3 py-2 rounded-xl bg-secondary text-foreground font-bold disabled:opacity-50"
+                  >
+                    {photoUploadBusy ? "جارٍ الرفع..." : "إلغاء"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </>,
+          document.body,
+        )
+      : null;
 
 
   useEffect(() => {
@@ -683,6 +807,7 @@ export default function FamilyFeud() {
   if (screen === "start") {
     return (
       <div className="min-h-screen bg-dots-start flex flex-col items-center justify-center p-4" dir="rtl">
+        {dragDropOverlay}
         <div className="relative flex flex-col items-center justify-center mb-16 md:scale-125">
           <div className="w-[340px] h-[180px] md:w-[540px] md:h-[270px] bg-gradient-to-b from-[#4774d6] to-[#1d4199] rounded-[100%] border-[4px] md:border-[6px] border-white shadow-[0_0_20px_rgba(0,0,0,0.8),inset_0_0_30px_rgba(0,0,0,0.5)] flex flex-col items-center justify-center relative z-10 outline outline-4 outline-[#dca34b]">
             <h1 className="logo-text text-[44px] md:text-[78px] leading-[1.1] text-center whitespace-nowrap">
@@ -718,6 +843,7 @@ export default function FamilyFeud() {
   if (screen === "host") {
     return (
       <div className="min-h-screen bg-host text-white p-4 md:p-8" dir="rtl">
+        {dragDropOverlay}
         <div className="max-w-5xl mx-auto flex justify-between items-center mb-6 flex-wrap gap-3">
           <button
             onClick={() => setScreen("start")}
@@ -1059,6 +1185,7 @@ export default function FamilyFeud() {
   // ============ Game ============
   return (
     <div className="min-h-screen flex flex-col font-sans overflow-hidden bg-[#051024]" dir="rtl">
+      {dragDropOverlay}
       <div
         className="flex-1 relative flex items-center justify-center p-2 md:p-6"
         style={{
