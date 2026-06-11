@@ -56,6 +56,24 @@ export async function uploadTeamPhoto(team: 1 | 2, file: File): Promise<string> 
   return url;
 }
 
+export async function uploadTeamPhotoBlob(team: 1 | 2, blob: Blob): Promise<string> {
+  if (blob.size > 4 * 1024 * 1024) {
+    throw new TeamPhotoError("الصورة كبيرة جداً بعد القص");
+  }
+  const path = `team${team}.jpg`;
+  const { error } = await supabase.storage
+    .from(PHOTO_BUCKET)
+    .upload(path, blob, { contentType: "image/jpeg", upsert: true });
+  if (error) throw new TeamPhotoError("تعذّر رفع الصورة: " + error.message);
+  const { data: signed } = await supabase.storage
+    .from(PHOTO_BUCKET)
+    .createSignedUrl(path, 60 * 60 * 24 * 365);
+  if (!signed?.signedUrl) throw new TeamPhotoError("تعذّر توليد رابط الصورة");
+  const url = `${signed.signedUrl}&v=${Date.now()}`;
+  sendMessage({ action: "SET_TEAM_PHOTO", payload: { team, url } });
+  return url;
+}
+
 export async function deleteTeamPhoto(team: 1 | 2): Promise<void> {
   await supabase.storage.from(PHOTO_BUCKET).remove([`team${team}.jpg`]);
   sendMessage({ action: "SET_TEAM_PHOTO", payload: { team, url: null } });
