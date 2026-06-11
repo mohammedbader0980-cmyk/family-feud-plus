@@ -17,9 +17,10 @@ import {
 import { sendMessage, subscribe, type SyncMessage } from "@/lib/feud-sync";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  uploadTeamPhoto as uploadTeamPhotoLib,
+  uploadTeamPhotoBlob,
   TeamPhotoError,
 } from "@/lib/team-photo-upload";
+import TeamPhotoCropper from "@/components/TeamPhotoCropper";
 
 type Track = {
   id: string;
@@ -129,6 +130,7 @@ export default function FamilyFeud() {
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [pendingPhotoFile, setPendingPhotoFile] = useState<File | null>(null);
   const [photoUploadBusy, setPhotoUploadBusy] = useState(false);
+  const [cropTeam, setCropTeam] = useState<1 | 2 | null>(null);
 
   useEffect(() => {
     let depth = 0;
@@ -169,21 +171,32 @@ export default function FamilyFeud() {
     };
   }, []);
 
-  const handlePhotoDropChoice = async (team: 1 | 2) => {
+  const handlePhotoDropChoice = (team: 1 | 2) => {
     if (!pendingPhotoFile) return;
-    const file = pendingPhotoFile;
+    setCropTeam(team);
+  };
+
+  const handleCropConfirm = async (blob: Blob) => {
+    if (!pendingPhotoFile || !cropTeam) return;
+    const team = cropTeam;
     setPhotoUploadBusy(true);
     try {
-      const url = await uploadTeamPhotoLib(team, file);
+      const url = await uploadTeamPhotoBlob(team, blob);
       if (team === 1) setTeam1Photo(url);
       else setTeam2Photo(url);
+      setCropTeam(null);
+      setPendingPhotoFile(null);
     } catch (e) {
       alert(e instanceof TeamPhotoError ? e.message : "فشل رفع الصورة");
     } finally {
       setPhotoUploadBusy(false);
-      setPendingPhotoFile(null);
     }
   };
+
+  const handleCropCancel = () => {
+    setCropTeam(null);
+  };
+
 
   const dragDropOverlay =
     typeof document !== "undefined" && (isDraggingFile || pendingPhotoFile)
@@ -196,7 +209,7 @@ export default function FamilyFeud() {
                 </div>
               </div>
             )}
-            {pendingPhotoFile && (
+            {pendingPhotoFile && !cropTeam && (
               <div
                 className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 p-4"
                 onClick={() => !photoUploadBusy && setPendingPhotoFile(null)}
@@ -215,14 +228,14 @@ export default function FamilyFeud() {
                   <div className="flex gap-3">
                     <button
                       disabled={photoUploadBusy}
-                      onClick={() => void handlePhotoDropChoice(1)}
+                      onClick={() => handlePhotoDropChoice(1)}
                       className="flex-1 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold disabled:opacity-50"
                     >
                       {team1Name}
                     </button>
                     <button
                       disabled={photoUploadBusy}
-                      onClick={() => void handlePhotoDropChoice(2)}
+                      onClick={() => handlePhotoDropChoice(2)}
                       className="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold disabled:opacity-50"
                     >
                       {team2Name}
@@ -233,10 +246,20 @@ export default function FamilyFeud() {
                     onClick={() => setPendingPhotoFile(null)}
                     className="w-full mt-3 py-2 rounded-xl bg-secondary text-foreground font-bold disabled:opacity-50"
                   >
-                    {photoUploadBusy ? "جارٍ الرفع..." : "إلغاء"}
+                    إلغاء
                   </button>
                 </div>
               </div>
+            )}
+            {pendingPhotoFile && cropTeam && (
+              <TeamPhotoCropper
+                file={pendingPhotoFile}
+                team={cropTeam}
+                teamName={cropTeam === 1 ? team1Name : team2Name}
+                busy={photoUploadBusy}
+                onCancel={handleCropCancel}
+                onConfirm={(blob) => void handleCropConfirm(blob)}
+              />
             )}
           </>,
           document.body,
