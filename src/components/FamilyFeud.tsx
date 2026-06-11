@@ -209,7 +209,7 @@ export default function FamilyFeud() {
                 </div>
               </div>
             )}
-            {pendingPhotoFile && (
+            {pendingPhotoFile && !cropTeam && (
               <div
                 className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 p-4"
                 onClick={() => !photoUploadBusy && setPendingPhotoFile(null)}
@@ -228,14 +228,14 @@ export default function FamilyFeud() {
                   <div className="flex gap-3">
                     <button
                       disabled={photoUploadBusy}
-                      onClick={() => void handlePhotoDropChoice(1)}
+                      onClick={() => handlePhotoDropChoice(1)}
                       className="flex-1 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold disabled:opacity-50"
                     >
                       {team1Name}
                     </button>
                     <button
                       disabled={photoUploadBusy}
-                      onClick={() => void handlePhotoDropChoice(2)}
+                      onClick={() => handlePhotoDropChoice(2)}
                       className="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold disabled:opacity-50"
                     >
                       {team2Name}
@@ -246,10 +246,20 @@ export default function FamilyFeud() {
                     onClick={() => setPendingPhotoFile(null)}
                     className="w-full mt-3 py-2 rounded-xl bg-secondary text-foreground font-bold disabled:opacity-50"
                   >
-                    {photoUploadBusy ? "جارٍ الرفع..." : "إلغاء"}
+                    إلغاء
                   </button>
                 </div>
               </div>
+            )}
+            {pendingPhotoFile && cropTeam && (
+              <TeamPhotoCropper
+                file={pendingPhotoFile}
+                team={cropTeam}
+                teamName={cropTeam === 1 ? team1Name : team2Name}
+                busy={photoUploadBusy}
+                onCancel={handleCropCancel}
+                onConfirm={(blob) => void handleCropConfirm(blob)}
+              />
             )}
           </>,
           document.body,
