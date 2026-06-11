@@ -620,6 +620,16 @@ export default function FeudController() {
           متصل عبر الشبكة - يمكن استخدامه من أي جهاز يمسح رمز QR
         </p>
       </div>
+      {cropTarget && (
+        <TeamPhotoCropper
+          file={cropTarget.file}
+          team={cropTarget.team}
+          teamName={cropTarget.team === 1 ? state.team1Name : state.team2Name}
+          busy={photoUploading === cropTarget.team}
+          onCancel={() => setCropTarget(null)}
+          onConfirm={(blob) => void handleCropConfirm(blob)}
+        />
+      )}
     </div>
   );
 }
