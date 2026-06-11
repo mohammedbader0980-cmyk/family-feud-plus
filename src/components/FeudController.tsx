@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { sendMessage, subscribe, type DisplayState, type SyncMessage } from "@/lib/feud-sync";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  uploadTeamPhoto as uploadTeamPhotoLib,
+  uploadTeamPhotoBlob,
   deleteTeamPhoto as deleteTeamPhotoLib,
   TeamPhotoError,
 } from "@/lib/team-photo-upload";
+import TeamPhotoCropper from "@/components/TeamPhotoCropper";
 
 type State = DisplayState["payload"];
 
@@ -120,11 +121,27 @@ export default function FeudController() {
   // ===== Team photo upload =====
   const [photoUploading, setPhotoUploading] = useState<0 | 1 | 2>(0);
   const [dragOverTeam, setDragOverTeam] = useState<0 | 1 | 2>(0);
+  const [cropTarget, setCropTarget] = useState<{ team: 1 | 2; file: File } | null>(null);
 
-  const uploadTeamPhoto = async (team: 1 | 2, file: File) => {
+  const openCropper = (team: 1 | 2, file: File) => {
+    if (!/^image\/(jpe?g|png)$/i.test(file.type)) {
+      alert("الصورة يجب أن تكون JPG أو PNG");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      alert("حجم الصورة يجب أن يكون أقل من 2 ميجابايت");
+      return;
+    }
+    setCropTarget({ team, file });
+  };
+
+  const handleCropConfirm = async (blob: Blob) => {
+    if (!cropTarget) return;
+    const team = cropTarget.team;
     setPhotoUploading(team);
     try {
-      await uploadTeamPhotoLib(team, file);
+      await uploadTeamPhotoBlob(team, blob);
+      setCropTarget(null);
     } catch (e) {
       console.error(e);
       alert(e instanceof TeamPhotoError ? e.message : "فشل رفع الصورة");
@@ -391,7 +408,7 @@ export default function FeudController() {
                   e.preventDefault();
                   setDragOverTeam(0);
                   const f = e.dataTransfer.files?.[0];
-                  if (f && !busy) void uploadTeamPhoto(team, f);
+                  if (f && !busy) openCropper(team, f);
                 }}
                 className={`flex items-center gap-3 p-2 mb-2 rounded-lg bg-secondary/40 border-2 transition-colors ${
                   dragOver
@@ -428,7 +445,7 @@ export default function FeudController() {
                         className="hidden"
                         onChange={(e) => {
                           const f = e.target.files?.[0];
-                          if (f) void uploadTeamPhoto(team, f);
+                          if (f) openCropper(team, f);
                           e.target.value = "";
                         }}
                       />
