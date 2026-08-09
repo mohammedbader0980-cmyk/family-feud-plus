@@ -504,7 +504,7 @@ export default function FamilyFeud() {
     setRevealed(Array(8).fill(false));
     setRoundPoints(0);
     setStrikes(0);
-    setTimerSec(30);
+    setTimerSec(timerDuration);
     setTimerRunning(false);
   };
   const nextQ = () => {
@@ -528,7 +528,7 @@ export default function FamilyFeud() {
     setTeam2Score(0);
     setRoundPoints(0);
     setStrikes(0);
-    setTimerSec(30);
+    setTimerSec(timerDuration);
     setTimerRunning(false);
     setShowQuestion(true);
     setScreen("game");
@@ -549,6 +549,9 @@ export default function FamilyFeud() {
     prevQ,
     toggleMusic,
     setTimerRunning,
+    setTimerSec,
+    setTimerDuration,
+    timerDuration,
     setShowQuestion,
     setScreen,
     setTeam1Score,
@@ -579,6 +582,9 @@ export default function FamilyFeud() {
       prevQ,
       toggleMusic,
       setTimerRunning,
+      setTimerSec,
+      setTimerDuration,
+      timerDuration,
       setShowQuestion,
       setScreen,
       setTeam1Score,
@@ -620,6 +626,7 @@ export default function FamilyFeud() {
       })),
       timerSec,
       timerRunning,
+      timerDuration,
       musicPlaying,
       hasMusic: tracks.length > 0,
       musicVolume,
@@ -648,6 +655,7 @@ export default function FamilyFeud() {
     revealed,
     timerSec,
     timerRunning,
+    timerDuration,
     musicPlaying,
     musicVolume,
     musicLoop,
@@ -694,6 +702,20 @@ export default function FamilyFeud() {
         case "START_TIMER":
           h.setTimerRunning(!h.timerRunning);
           break;
+        case "PAUSE_TIMER":
+          h.setTimerRunning(false);
+          break;
+        case "RESET_TIMER":
+          h.setTimerRunning(false);
+          h.setTimerSec(h.timerDuration);
+          break;
+        case "SET_TIMER_DURATION": {
+          const secs = Math.max(5, Math.min(600, Math.round(msg.payload.seconds)));
+          h.setTimerDuration(secs);
+          h.setTimerSec(secs);
+          h.setTimerRunning(false);
+          break;
+        }
         case "RESET_QUESTION":
           h.resetRound();
           break;
@@ -1406,7 +1428,7 @@ export default function FamilyFeud() {
           </button>
           <button
             onClick={() => {
-              setTimerSec(30);
+              setTimerSec(timerDuration);
               setTimerRunning(false);
             }}
             className="px-2 py-2 bg-gray-900 rounded border border-gray-700 text-xs"
