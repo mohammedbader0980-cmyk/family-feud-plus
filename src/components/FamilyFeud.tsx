@@ -436,6 +436,7 @@ export default function FamilyFeud() {
   const [showQuestion, setShowQuestion] = useState(true);
 
   // Timer
+  const [timerDuration, setTimerDuration] = useState(30);
   const [timerSec, setTimerSec] = useState(30);
   const [timerRunning, setTimerRunning] = useState(false);
   const timerRef = useRef<number | null>(null);
