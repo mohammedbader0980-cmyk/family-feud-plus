@@ -14,6 +14,9 @@ export type ControllerAction =
   | { action: "WIN_TEAM"; payload: { team: 1 | 2 } }
   | { action: "TOGGLE_MUSIC" }
   | { action: "START_TIMER" }
+  | { action: "PAUSE_TIMER" }
+  | { action: "RESET_TIMER" }
+  | { action: "SET_TIMER_DURATION"; payload: { seconds: number } }
   | { action: "RESET_QUESTION" }
   | { action: "UPDATE_SCORE"; payload: { team: 1 | 2; delta: number } }
   | { action: "GO_HOME" }
