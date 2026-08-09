@@ -50,6 +50,7 @@ export type DisplayState = {
     answers: { text: string; points: number }[];
     timerSec: number;
     timerRunning: boolean;
+    timerDuration: number;
     musicPlaying: boolean;
     hasMusic: boolean;
     musicVolume: number;
