@@ -1232,6 +1232,27 @@ export default function FamilyFeud() {
   return (
     <div className="min-h-screen flex flex-col font-sans overflow-hidden bg-[#051024]" dir="rtl">
       {dragDropOverlay}
+      {/* Big timer at the very top */}
+      <div className="fixed top-2 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
+        <div
+          className={`px-6 md:px-10 py-1.5 md:py-3 rounded-full border-2 md:border-4 shadow-2xl flex items-center gap-2 md:gap-3 transition-colors ${
+            timerSec === 0
+              ? "bg-red-700/95 border-red-300 animate-pulse"
+              : timerRunning
+                ? "bg-[#0b1f4d]/95 border-[#dca34b]"
+                : "bg-black/70 border-[#3a6bdc]"
+          }`}
+        >
+          <span className="text-xl md:text-3xl">⏱</span>
+          <span
+            className="text-white font-bold tabular-nums text-3xl md:text-6xl drop-shadow-lg"
+            style={{ letterSpacing: "0.05em" }}
+          >
+            {String(Math.floor(timerSec / 60)).padStart(2, "0")}:
+            {String(timerSec % 60).padStart(2, "0")}
+          </span>
+        </div>
+      </div>
       <div
         className="flex-1 relative flex items-center justify-center p-2 md:p-6"
         style={{
