@@ -26,6 +26,7 @@ const defaultState: State = {
   answers: Array.from({ length: 8 }, () => ({ text: "", points: 0 })),
   timerSec: 30,
   timerRunning: false,
+  timerDuration: 30,
   musicPlaying: false,
   hasMusic: false,
   musicVolume: 0.5,
@@ -299,8 +300,63 @@ export default function FeudController() {
             onClick={() => send({ action: "START_TIMER" })}
             className={`${btnBase} ${state.timerRunning ? colors.purpleActive : colors.purple}`}
           >
-            ⏱️ 30s
+            {state.timerRunning ? "⏸️ إيقاف المؤقت" : "▶️ تشغيل المؤقت"}
           </button>
+        </div>
+
+        {/* Timer duration control */}
+        <div className="rounded-2xl bg-card border-2 border-purple-700/40 p-3 shadow-lg">
+          <div className="flex items-center justify-between mb-2">
+            <span className="font-bold text-sm">⏱ مدة المؤقت</span>
+            <span className="font-mono text-lg text-amber-400">{fmtTimer}</span>
+          </div>
+          <div className="grid grid-cols-4 gap-2">
+            {[15, 30, 45, 60, 90, 120, 180, 300].map((s) => (
+              <button
+                key={s}
+                onClick={() => send({ action: "SET_TIMER_DURATION", payload: { seconds: s } })}
+                className={`py-2 rounded-lg font-bold text-sm ${
+                  state.timerDuration === s
+                    ? "bg-purple-600 text-white"
+                    : "bg-secondary text-foreground"
+                }`}
+              >
+                {s < 60 ? `${s}ث` : `${s / 60}د`}
+              </button>
+            ))}
+          </div>
+          <div className="mt-2 flex gap-2">
+            <input
+              type="number"
+              min={5}
+              max={600}
+              placeholder="مدة مخصصة (ثانية)"
+              className="flex-1 rounded-lg bg-secondary px-3 py-2 text-sm"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  const v = Number((e.target as HTMLInputElement).value);
+                  if (v >= 5) send({ action: "SET_TIMER_DURATION", payload: { seconds: v } });
+                }
+              }}
+              id="custom-timer-input"
+            />
+            <button
+              onClick={() => {
+                const el = document.getElementById("custom-timer-input") as HTMLInputElement | null;
+                const v = Number(el?.value);
+                if (v >= 5) send({ action: "SET_TIMER_DURATION", payload: { seconds: v } });
+              }}
+              className="px-4 rounded-lg bg-purple-600 text-white font-bold text-sm"
+            >
+              تعيين
+            </button>
+            <button
+              onClick={() => send({ action: "RESET_TIMER" })}
+              className="px-4 rounded-lg bg-secondary font-bold text-sm"
+            >
+              ↺
+            </button>
+          </div>
         </div>
 
         {/* Row 4: Navigation */}
