@@ -1232,21 +1232,25 @@ export default function FamilyFeud() {
   return (
     <div className="min-h-screen flex flex-col font-sans overflow-hidden bg-[#051024]" dir="rtl">
       {dragDropOverlay}
-      {/* Big timer at the very top */}
-      <div className="fixed top-2 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
+      {/* Big timer - top corner so it never covers the logo */}
+      <div className="fixed top-[max(0.5rem,env(safe-area-inset-top))] left-2 md:left-4 z-50 pointer-events-none">
         <div
-          className={`px-6 md:px-10 py-1.5 md:py-3 rounded-full border-2 md:border-4 shadow-2xl flex items-center gap-2 md:gap-3 transition-colors ${
+          className={`rounded-full border-2 md:border-4 shadow-2xl flex items-center gap-[0.4em] transition-colors ${
             timerSec === 0
               ? "bg-red-700/95 border-red-300 animate-pulse"
               : timerRunning
                 ? "bg-[#0b1f4d]/95 border-[#dca34b]"
                 : "bg-black/70 border-[#3a6bdc]"
           }`}
+          style={{
+            fontSize: "clamp(0.9rem, min(3.2vw, 3.6vh), 2.4rem)",
+            padding: "0.35em 0.9em",
+          }}
         >
-          <span className="text-xl md:text-3xl">⏱</span>
+          <span style={{ fontSize: "0.8em" }}>⏱</span>
           <span
-            className="text-white font-bold tabular-nums text-3xl md:text-6xl drop-shadow-lg"
-            style={{ letterSpacing: "0.05em" }}
+            className="text-white font-bold tabular-nums drop-shadow-lg"
+            style={{ letterSpacing: "0.05em", fontSize: "1.5em", lineHeight: 1.1 }}
           >
             {String(Math.floor(timerSec / 60)).padStart(2, "0")}:
             {String(timerSec % 60).padStart(2, "0")}
@@ -1260,11 +1264,14 @@ export default function FamilyFeud() {
             "linear-gradient(90deg, #943d00 0%, #943d00 15%, #051024 15%, #051024 85%, #943d00 85%, #943d00 100%)",
         }}
       >
-        <div className="board-outer bg-dots-board w-full max-w-[1200px] relative pt-16 pb-8 px-4 md:px-16 md:py-16 flex flex-col items-center justify-center z-10 mt-8 md:mt-0">
+        <div className="board-outer bg-dots-board w-full max-w-[1200px] relative pt-16 pb-8 px-4 md:px-16 md:py-16 flex flex-col items-center justify-center z-10 mt-12 sm:mt-10 md:mt-0">
           {/* Top logo + round points */}
-          <div className="absolute -top-12 md:-top-16 flex flex-col items-center z-30">
-            <div className="w-44 h-24 md:w-64 md:h-28 bg-gradient-to-b from-[#4774d6] to-[#1d4199] rounded-[100%] border-2 md:border-[3px] border-[#dca34b] shadow-xl flex flex-col items-center justify-center">
-              <span className="logo-text text-xl md:text-3xl leading-tight text-center whitespace-nowrap">
+          <div className="absolute -top-12 md:-top-16 flex flex-col items-center z-40 w-full px-2">
+            <div className="bg-gradient-to-b from-[#4774d6] to-[#1d4199] rounded-[100%] border-2 md:border-[3px] border-[#dca34b] shadow-xl flex flex-col items-center justify-center w-[min(70vw,17rem)] px-6 py-3 md:py-4">
+              <span
+                className="logo-text leading-tight text-center whitespace-nowrap"
+                style={{ fontSize: "clamp(1.05rem, min(4.2vw, 4.4vh), 2rem)" }}
+              >
                 حارة البطل
               </span>
             </div>
@@ -1272,6 +1279,7 @@ export default function FamilyFeud() {
               <span className="text-white text-xl md:text-3xl font-bold">{roundPoints}</span>
             </div>
           </div>
+
 
           {/* Team 1 (right) */}
           <div className="absolute -right-6 md:-right-12 top-1/2 -translate-y-1/2 z-30 flex flex-col items-center">
