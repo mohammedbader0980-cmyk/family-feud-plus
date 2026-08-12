@@ -65,7 +65,23 @@ export type DisplayState = {
 
 export type SyncMessage = ControllerAction | DisplayState;
 
-const ROOM = "feud-control";
+const roomName = () => {
+  if (typeof window === "undefined") return "feud-control";
+  const fromUrl = new URLSearchParams(window.location.search).get("session");
+  let id = fromUrl?.trim().toUpperCase() || null;
+  if (!id) {
+    try {
+      id = window.localStorage.getItem("feud-session-id");
+      if (!id) {
+        id = Math.random().toString(36).slice(2, 8).toUpperCase();
+        window.localStorage.setItem("feud-session-id", id);
+      }
+    } catch {
+      id = null;
+    }
+  }
+  return id ? `feud-control-${id}` : "feud-control";
+};
 const EVENT = "sync";
 
 const SENDER_ID =
@@ -84,7 +100,7 @@ const ensureChannel = (): RealtimeChannel | null => {
   if (typeof window === "undefined") return null;
   if (channel) return channel;
 
-  channel = supabase.channel(ROOM, {
+  channel = supabase.channel(roomName(), {
     config: { broadcast: { self: false, ack: false } },
   });
 

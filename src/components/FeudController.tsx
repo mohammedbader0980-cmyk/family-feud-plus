@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { sendMessage, subscribe, type DisplayState, type SyncMessage } from "@/lib/feud-sync";
+import { getSessionId, loadSessionState } from "@/lib/feud-session";
 import { supabase } from "@/integrations/supabase/client";
 import {
   uploadTeamPhotoBlob,
@@ -55,6 +56,8 @@ export default function FeudController() {
   const [state, setState] = useState<State>(defaultState);
   const [connected, setConnected] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [sessionId, setSessionId] = useState("");
+  useEffect(() => setSessionId(getSessionId()), []);
 
   useEffect(() => {
     const off = subscribe((msg: SyncMessage) => {
@@ -62,6 +65,10 @@ export default function FeudController() {
         setState(msg.payload);
         setConnected(true);
       }
+    });
+    // Fallback: last saved state from the database until the display answers
+    void loadSessionState().then((saved) => {
+      if (saved) setState((prev) => (prev === defaultState ? saved : prev));
     });
     sendMessage({ action: "REQUEST_STATE" });
     const t = window.setInterval(() => {
@@ -165,7 +172,9 @@ export default function FeudController() {
         {/* Header status */}
         <div className="rounded-2xl bg-card border border-border p-4 shadow-lg">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs text-muted-foreground">وحدة تحكم حارة البطل</span>
+            <span className="text-xs text-muted-foreground">
+              وحدة تحكم حارة البطل{sessionId ? ` · جلسة ${sessionId}` : ""}
+            </span>
             <span
               className={`text-xs px-2 py-1 rounded-full ${
                 connected ? "bg-emerald-700 text-white" : "bg-gray-700 text-gray-200"

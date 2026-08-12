@@ -15,6 +15,7 @@ import {
   idbGetAllTracks,
 } from "@/lib/music-db";
 import { sendMessage, subscribe, type SyncMessage } from "@/lib/feud-sync";
+import { getSessionId, saveSessionState } from "@/lib/feud-session";
 import { supabase } from "@/integrations/supabase/client";
 import {
   uploadTeamPhotoBlob,
@@ -641,7 +642,9 @@ export default function FamilyFeud() {
 
   // Broadcast state snapshot whenever something the controller shows changes
   useEffect(() => {
-    sendMessage({ action: "STATE", payload: buildSnapshot() });
+    const snap = buildSnapshot();
+    sendMessage({ action: "STATE", payload: snap });
+    saveSessionState(snap);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     currentQIndex,
@@ -1584,7 +1587,10 @@ export default function FamilyFeud() {
 }
 
 function QRModal({ onClose }: { onClose: () => void }) {
-  const url = typeof window !== "undefined" ? `${window.location.origin}/controller` : "/controller";
+  const [url, setUrl] = useState("/controller");
+  useEffect(() => {
+    setUrl(`${window.location.origin}/controller?session=${getSessionId()}`);
+  }, []);
   const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(url)}`;
   const [copied, setCopied] = useState(false);
   const copy = async () => {
