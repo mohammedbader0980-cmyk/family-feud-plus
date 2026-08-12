@@ -65,7 +65,19 @@ export type DisplayState = {
 
 export type SyncMessage = ControllerAction | DisplayState;
 
-const ROOM = "feud-control";
+const roomName = () => {
+  if (typeof window === "undefined") return "feud-control";
+  const fromUrl = new URLSearchParams(window.location.search).get("session");
+  let id = fromUrl?.trim().toUpperCase() || null;
+  if (!id) {
+    try {
+      id = window.localStorage.getItem("feud-session-id");
+    } catch {
+      id = null;
+    }
+  }
+  return id ? `feud-control-${id}` : "feud-control";
+};
 const EVENT = "sync";
 
 const SENDER_ID =
