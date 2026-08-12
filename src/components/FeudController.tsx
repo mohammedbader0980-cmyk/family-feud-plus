@@ -63,6 +63,10 @@ export default function FeudController() {
         setConnected(true);
       }
     });
+    // Fallback: last saved state from the database until the display answers
+    void loadSessionState().then((saved) => {
+      if (saved) setState((prev) => (prev === defaultState ? saved : prev));
+    });
     sendMessage({ action: "REQUEST_STATE" });
     const t = window.setInterval(() => {
       if (!connected) sendMessage({ action: "REQUEST_STATE" });
