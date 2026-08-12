@@ -1587,7 +1587,10 @@ export default function FamilyFeud() {
 }
 
 function QRModal({ onClose }: { onClose: () => void }) {
-  const url = typeof window !== "undefined" ? `${window.location.origin}/controller` : "/controller";
+  const [url, setUrl] = useState("/controller");
+  useEffect(() => {
+    setUrl(`${window.location.origin}/controller?session=${getSessionId()}`);
+  }, []);
   const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(url)}`;
   const [copied, setCopied] = useState(false);
   const copy = async () => {
