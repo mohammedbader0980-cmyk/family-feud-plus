@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { sendMessage, subscribe, type DisplayState, type SyncMessage } from "@/lib/feud-sync";
+import { getSessionId, loadSessionState } from "@/lib/feud-session";
 import { supabase } from "@/integrations/supabase/client";
 import {
   uploadTeamPhotoBlob,
