@@ -72,6 +72,10 @@ const roomName = () => {
   if (!id) {
     try {
       id = window.localStorage.getItem("feud-session-id");
+      if (!id) {
+        id = Math.random().toString(36).slice(2, 8).toUpperCase();
+        window.localStorage.setItem("feud-session-id", id);
+      }
     } catch {
       id = null;
     }
