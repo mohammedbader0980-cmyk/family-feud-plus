@@ -96,7 +96,7 @@ const ensureChannel = (): RealtimeChannel | null => {
   if (typeof window === "undefined") return null;
   if (channel) return channel;
 
-  channel = supabase.channel(ROOM, {
+  channel = supabase.channel(roomName(), {
     config: { broadcast: { self: false, ack: false } },
   });
 
