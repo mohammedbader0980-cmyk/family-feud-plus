@@ -170,7 +170,9 @@ export default function FeudController() {
         {/* Header status */}
         <div className="rounded-2xl bg-card border border-border p-4 shadow-lg">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs text-muted-foreground">وحدة تحكم حارة البطل</span>
+            <span className="text-xs text-muted-foreground">
+              وحدة تحكم حارة البطل{sessionId ? ` · جلسة ${sessionId}` : ""}
+            </span>
             <span
               className={`text-xs px-2 py-1 rounded-full ${
                 connected ? "bg-emerald-700 text-white" : "bg-gray-700 text-gray-200"
