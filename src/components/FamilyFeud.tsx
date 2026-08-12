@@ -15,6 +15,7 @@ import {
   idbGetAllTracks,
 } from "@/lib/music-db";
 import { sendMessage, subscribe, type SyncMessage } from "@/lib/feud-sync";
+import { getSessionId, saveSessionState } from "@/lib/feud-session";
 import { supabase } from "@/integrations/supabase/client";
 import {
   uploadTeamPhotoBlob,
