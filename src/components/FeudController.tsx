@@ -56,6 +56,8 @@ export default function FeudController() {
   const [state, setState] = useState<State>(defaultState);
   const [connected, setConnected] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [sessionId, setSessionId] = useState("");
+  useEffect(() => setSessionId(getSessionId()), []);
 
   useEffect(() => {
     const off = subscribe((msg: SyncMessage) => {
