@@ -641,7 +641,9 @@ export default function FamilyFeud() {
 
   // Broadcast state snapshot whenever something the controller shows changes
   useEffect(() => {
-    sendMessage({ action: "STATE", payload: buildSnapshot() });
+    const snap = buildSnapshot();
+    sendMessage({ action: "STATE", payload: snap });
+    saveSessionState(snap);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     currentQIndex,
