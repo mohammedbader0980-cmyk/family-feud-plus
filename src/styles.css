@@ -240,3 +240,5 @@
   0%,100% { transform: scale(1); box-shadow: 0 0 10px rgba(220,60,60,0.4); }
   50% { transform: scale(1.06); box-shadow: 0 0 26px rgba(220,60,60,0.9); }
 }
+.feud-controls button { transition: transform 0.08s ease, filter 0.15s ease; }
+.feud-controls button:active:not(:disabled) { transform: scale(0.94); filter: brightness(1.25); }

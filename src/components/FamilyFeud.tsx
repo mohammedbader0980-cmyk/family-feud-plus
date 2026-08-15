@@ -1241,11 +1241,23 @@ export default function FamilyFeud() {
       {/* Big timer - top corner so it never covers the logo */}
       <div className="fixed top-[max(0.5rem,env(safe-area-inset-top))] left-2 md:left-4 z-50 pointer-events-none">
         <div
+          className={`rounded-full p-[3px] ${timerSec <= 10 && timerRunning ? "timer-warn" : ""}`}
+          style={{
+            background: `conic-gradient(${
+              timerSec <= 10 ? "#ef4444" : "#dca34b"
+            } ${Math.max(0, Math.min(1, timerSec / (timerDuration || 1))) * 360}deg, rgba(255,255,255,0.12) 0deg)`,
+            borderRadius: "9999px",
+            transition: "background 0.4s linear",
+          }}
+        >
+        <div
           className={`rounded-full border-2 md:border-4 shadow-2xl flex items-center gap-[0.4em] transition-colors ${
             timerSec === 0
               ? "bg-red-700/95 border-red-300 animate-pulse"
               : timerRunning
-                ? "bg-[#0b1f4d]/95 border-[#dca34b]"
+                ? timerSec <= 10
+                  ? "bg-[#4d0b0b]/95 border-red-400"
+                  : "bg-[#0b1f4d]/95 border-[#dca34b]"
                 : "bg-black/70 border-[#3a6bdc]"
           }`}
           style={{
@@ -1261,6 +1273,7 @@ export default function FamilyFeud() {
             {String(Math.floor(timerSec / 60)).padStart(2, "0")}:
             {String(timerSec % 60).padStart(2, "0")}
           </span>
+        </div>
         </div>
       </div>
       <div
