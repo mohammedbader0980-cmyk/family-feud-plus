@@ -103,3 +103,31 @@ export const playWin = () => {
     o.stop(c.currentTime + i * 0.12 + 0.3);
   });
 };
+
+// Short synthesized applause (white-noise bursts) for the win moment.
+export const playApplause = () => {
+  const c = getCtx();
+  if (!c) return;
+  const dur = 2.2;
+  const buffer = c.createBuffer(1, Math.floor(c.sampleRate * dur), c.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < data.length; i++) {
+    const t = i / c.sampleRate;
+    const env = Math.min(1, t * 6) * Math.max(0, 1 - t / dur);
+    const clap = 0.6 + 0.4 * Math.sin(t * 55 + Math.sin(t * 17) * 3);
+    data[i] = (Math.random() * 2 - 1) * env * clap * 0.35;
+  }
+  const src = c.createBufferSource();
+  src.buffer = buffer;
+  const bp = c.createBiquadFilter();
+  bp.type = "bandpass";
+  bp.frequency.value = 1800;
+  bp.Q.value = 0.7;
+  const g = c.createGain();
+  g.gain.setValueAtTime(0.5, c.currentTime);
+  src.connect(bp);
+  bp.connect(g);
+  g.connect(c.destination);
+  src.start();
+  src.stop(c.currentTime + dur);
+};
