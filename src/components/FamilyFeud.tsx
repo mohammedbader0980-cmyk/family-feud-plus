@@ -5,6 +5,7 @@ import {
   playDing,
   playBuzzer,
   playWin,
+  playApplause,
   getCustomSound,
   setCustomSound,
   type SoundKey,
@@ -15,6 +16,7 @@ import {
   idbGetAllTracks,
 } from "@/lib/music-db";
 import { sendMessage, subscribe, type SyncMessage } from "@/lib/feud-sync";
+import { Typewriter, CountUp, Confetti } from "@/components/feud-fx";
 import { getSessionId, saveSessionState } from "@/lib/feud-session";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -496,6 +498,7 @@ export default function FamilyFeud() {
       setScoreBump((b) => ({ ...b, t2: b.t2 + 1 }));
     }
     playWin();
+    playApplause();
     setWinCelebrate(team);
     window.setTimeout(() => setWinCelebrate(0), 2200);
     setRoundPoints(0);
@@ -1279,7 +1282,7 @@ export default function FamilyFeud() {
               </span>
             </div>
             <div className="mt-1 bg-gradient-to-b from-[#3a6bdc] to-[#15347a] border-2 border-white rounded-full px-8 md:px-12 py-1 md:py-2 shadow-lg">
-              <span className="text-white text-xl md:text-3xl font-bold">{roundPoints}</span>
+              <span className="text-white text-xl md:text-3xl font-bold"><CountUp value={roundPoints} /></span>
             </div>
           </div>
 
@@ -1295,7 +1298,7 @@ export default function FamilyFeud() {
             />
             <div className="side-score w-16 h-20 md:w-28 md:h-32 flex items-center justify-center mt-1">
               <span className="text-white text-3xl md:text-5xl font-bold drop-shadow-md">
-                {team1Score}
+                <CountUp value={team1Score} />
               </span>
             </div>
             <button
@@ -1323,7 +1326,7 @@ export default function FamilyFeud() {
             />
             <div className="side-score w-16 h-20 md:w-28 md:h-32 flex items-center justify-center mt-1">
               <span className="text-white text-3xl md:text-5xl font-bold drop-shadow-md">
-                {team2Score}
+                <CountUp value={team2Score} />
               </span>
             </div>
             <button
@@ -1345,12 +1348,15 @@ export default function FamilyFeud() {
           <div className="board-inner w-full flex flex-col relative z-20 mt-6 md:mt-4 px-2 py-4 md:p-6">
             {showQuestion && (
               <div className="w-full mb-4 z-30">
-                <div className="bg-gradient-to-r from-[#000] via-[#1a1a1a] to-[#000] border-2 border-[#e09633] text-white text-center p-3 md:p-5 rounded-lg shadow-[0_5px_15px_rgba(0,0,0,0.8)] mx-auto w-[98%]">
+                <div
+                  key={currentQIndex}
+                  className="q-enter bg-gradient-to-r from-[#000] via-[#1a1a1a] to-[#000] border-2 border-[#e09633] text-white text-center p-3 md:p-5 rounded-lg shadow-[0_5px_15px_rgba(0,0,0,0.8)] mx-auto w-[98%]"
+                >
                   <h2
-                    className="text-lg md:text-3xl font-black leading-relaxed"
+                    className="text-lg md:text-3xl font-black leading-relaxed min-h-[1.6em]"
                     style={{ textShadow: "2px 2px 4px #000" }}
                   >
-                    {currentQ.question || "انتهت الأسئلة!"}
+                    <Typewriter text={currentQ.question || "انتهت الأسئلة!"} />
                   </h2>
                   <p className="text-gray-400 text-xs md:text-sm mt-2">
                     سؤال {currentQIndex + 1} من {questions.length}
@@ -1398,7 +1404,7 @@ export default function FamilyFeud() {
 
       {/* Control bar */}
       {!displayMode && (
-      <div className="bg-black border-t-2 border-gray-800 flex justify-between items-center px-2 py-2 md:px-6 md:py-3 text-gray-300 text-xs md:text-sm overflow-x-auto gap-2">
+      <div className="feud-controls bg-black border-t-2 border-gray-800 flex justify-between items-center px-2 py-2 md:px-6 md:py-3 text-gray-300 text-xs md:text-sm overflow-x-auto gap-2">
         <div className="flex gap-2 flex-shrink-0">
           <button
             onClick={() => setScreen("start")}
@@ -1544,6 +1550,7 @@ export default function FamilyFeud() {
 
       {winCelebrate > 0 && (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/80 pointer-events-none animate-fade-in">
+          <Confetti />
           <div className="animate-scale-in">
             <TeamAvatar
               team={winCelebrate as 1 | 2}
@@ -1554,7 +1561,7 @@ export default function FamilyFeud() {
               giant
             />
           </div>
-          <div className="mt-6 text-5xl md:text-7xl font-black text-amber-400 drop-shadow-[0_4px_8px_rgba(0,0,0,0.9)]">
+          <div className="win-pulse mt-6 text-5xl md:text-7xl font-black text-amber-400 drop-shadow-[0_4px_8px_rgba(0,0,0,0.9)]">
             🏆 {winCelebrate === 1 ? team1Name : team2Name}
           </div>
         </div>
@@ -1664,8 +1671,8 @@ function AnswerRow({
   return (
     <div
       onClick={onClick}
-      className={`flex-1 rounded flex overflow-hidden w-full min-h-[50px] md:min-h-[65px] cursor-pointer transition-transform hover:scale-[1.01] ${
-        isRevealed ? "slot-revealed" : "slot-bg"
+      className={`slot-perspective press-fx flex-1 rounded flex overflow-hidden w-full min-h-[50px] md:min-h-[65px] cursor-pointer hover:scale-[1.01] ${
+        isRevealed ? "slot-revealed slot-flip" : "slot-bg"
       }`}
     >
       {isRevealed ? (
@@ -1722,7 +1729,7 @@ export function TeamAvatar({
       key={bumpKey}
       className={`${sizeCls} ${glow} rounded-full overflow-hidden flex items-center justify-center font-black text-white shadow-lg ${
         bumpKey ? "animate-bounce" : ""
-      } ${photo ? "bg-black" : placeholderBg}`}
+      } ${bumpKey ? "avatar-burst" : ""} ${photo ? "bg-black" : placeholderBg}`}
       style={{ animationIterationCount: 2, animationDuration: "0.6s" }}
       title={name}
     >
