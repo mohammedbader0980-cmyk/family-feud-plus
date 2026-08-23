@@ -375,7 +375,7 @@ export default function FamilyFeud() {
         await idbDeleteTrack(target.id.replace(/^local-/, ""));
         URL.revokeObjectURL(target.url);
       } else if (target.source === "storage" && target.storagePath) {
-        await supabase.storage.from(MUSIC_BUCKET).remove([target.storagePath]);
+        await deleteMusicFn({ data: { ...sessionAuth(), path: target.storagePath } });
       }
     } catch (e) {
       console.error("Failed to delete track", e);
