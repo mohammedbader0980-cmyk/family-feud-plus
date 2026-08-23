@@ -34,44 +34,18 @@ type Track = {
   storagePath?: string;
 };
 
-const MUSIC_BUCKET = "feud-music";
-const PHOTO_BUCKET = "team-photos";
-
-const teamPhotoFile = (team: 1 | 2) => `team${team}.jpg`;
-const signTeamPhoto = async (team: 1 | 2): Promise<string | null> => {
-  try {
-    const { data } = await supabase.storage
-      .from(PHOTO_BUCKET)
-      .createSignedUrl(teamPhotoFile(team), 60 * 60 * 24 * 365);
-    return data?.signedUrl ?? null;
-  } catch {
-    return null;
-  }
-};
+const signTeamPhoto = (team: 1 | 2): Promise<string | null> => signTeamPhotoUrl(team);
 
 const loadStorageTracks = async (): Promise<Track[]> => {
   try {
-    const { data, error } = await supabase.storage.from(MUSIC_BUCKET).list("", {
-      limit: 200,
-      sortBy: { column: "created_at", order: "asc" },
-    });
-    if (error || !data) return [];
-    const tracks: Track[] = [];
-    for (const f of data) {
-      if (!f.name || f.name.startsWith(".")) continue;
-      const { data: signed } = await supabase.storage
-        .from(MUSIC_BUCKET)
-        .createSignedUrl(f.name, 60 * 60 * 24 * 7);
-      if (!signed?.signedUrl) continue;
-      tracks.push({
-        id: `storage-${f.name}`,
-        name: f.name.replace(/^\d+-/, ""),
-        url: signed.signedUrl,
-        source: "storage",
-        storagePath: f.name,
-      });
-    }
-    return tracks;
+    const { tracks } = await listMusicFn({ data: sessionAuth() });
+    return tracks.map((t) => ({
+      id: `storage-${t.path}`,
+      name: t.name,
+      url: t.url,
+      source: "storage" as const,
+      storagePath: t.path,
+    }));
   } catch (e) {
     console.error("[music] storage list failed", e);
     return [];
