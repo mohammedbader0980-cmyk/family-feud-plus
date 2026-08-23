@@ -94,14 +94,19 @@ export default function FeudController() {
     setUploading(true);
     try {
       for (const f of Array.from(files)) {
-        const safeName = f.name.replace(/[^\w.\-]+/g, "_");
-        const path = `${Date.now()}-${safeName}`;
-        const { error } = await supabase.storage
-          .from(MUSIC_BUCKET)
-          .upload(path, f, { contentType: f.type || "audio/mpeg", upsert: false });
-        if (error) {
-          console.error("upload error", error);
-          alert(`تعذّر رفع: ${f.name}\n${error.message}`);
+        try {
+          const upload = await createMusicUploadFn({
+            data: { ...sessionAuth(), fileName: f.name },
+          });
+          const { error } = await supabase.storage
+            .from(MUSIC_BUCKET)
+            .uploadToSignedUrl(upload.path, upload.token, f, {
+              contentType: f.type || "audio/mpeg",
+            });
+          if (error) throw error;
+        } catch (e) {
+          console.error("upload error", e);
+          alert(`تعذّر رفع: ${f.name}`);
         }
       }
       send({ action: "TRACKS_UPDATED" });
