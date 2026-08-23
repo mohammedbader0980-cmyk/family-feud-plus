@@ -25,6 +25,7 @@ import {
   TeamPhotoError,
 } from "@/lib/team-photo-upload";
 import TeamPhotoCropper from "@/components/TeamPhotoCropper";
+import { uploadSponsorMedia, clearSponsorMedia, SponsorMediaError } from "@/lib/sponsor-media";
 
 type Track = {
   id: string;
@@ -60,6 +61,7 @@ const LS_QUESTIONS = "familyFeudQuestions";
 const LS_TEAM1 = "familyFeudTeam1";
 const LS_TEAM2 = "familyFeudTeam2";
 const LS_CUSTOM_CATS = "familyFeudCustomCatalogs";
+const LS_SPONSOR_TEXT = "familyFeudSponsorText";
 
 const loadLS = <T,>(key: string, fallback: T): T => {
   if (typeof window === "undefined") return fallback;
@@ -86,12 +88,22 @@ export default function FamilyFeud() {
   const [scoreBump, setScoreBump] = useState<{ t1: number; t2: number }>({ t1: 0, t2: 0 });
   const [hydrated, setHydrated] = useState(false);
 
+  // Sponsor / opening screen — video, image or a thank-you message, shown
+  // on the display and controllable from the host panel or the phone.
+  const [sponsorText, setSponsorText] = useState("");
+  const [sponsorMediaKind, setSponsorMediaKind] = useState<"image" | "video" | null>(null);
+  const [sponsorMediaUrl, setSponsorMediaUrl] = useState<string | null>(null);
+  const [sponsorMediaExt, setSponsorMediaExt] = useState<string | null>(null);
+  const [sponsorVisible, setSponsorVisible] = useState(false);
+  const [sponsorUploading, setSponsorUploading] = useState(false);
+
   // Load persisted state from localStorage AFTER mount (avoid SSR overwriting)
   useEffect(() => {
     setQuestions(loadLS<Question[]>(LS_QUESTIONS, premadeCatalogs[0].questions));
     setTeam1Name(loadLS<string>(LS_TEAM1, "فريق 1"));
     setTeam2Name(loadLS<string>(LS_TEAM2, "فريق 2"));
     setCustomCatalogs(loadLS<Catalog[]>(LS_CUSTOM_CATS, []));
+    setSponsorText(loadLS<string>(LS_SPONSOR_TEXT, ""));
     setHydrated(true);
     // Load existing team photos from storage
     (async () => {
@@ -244,6 +256,13 @@ export default function FamilyFeud() {
         )
       : null;
 
+  const sponsorOverlay =
+    typeof document !== "undefined" && sponsorVisible
+      ? createPortal(
+          <SponsorScreen kind={sponsorMediaKind} url={sponsorMediaUrl} text={sponsorText} />,
+          document.body,
+        )
+      : null;
 
   useEffect(() => {
     if (!hydrated) return;
@@ -261,6 +280,10 @@ export default function FamilyFeud() {
     if (!hydrated) return;
     localStorage.setItem(LS_CUSTOM_CATS, JSON.stringify(customCatalogs));
   }, [customCatalogs, hydrated]);
+  useEffect(() => {
+    if (!hydrated) return;
+    localStorage.setItem(LS_SPONSOR_TEXT, JSON.stringify(sponsorText));
+  }, [sponsorText, hydrated]);
 
   // Music — merged from IndexedDB (local) + Supabase Storage (shared via controller)
   const [tracks, setTracks] = useState<Track[]>([]);
@@ -615,6 +638,11 @@ export default function FamilyFeud() {
       onGameScreen: screen === "game",
       team1Photo,
       team2Photo,
+      sponsorText,
+      sponsorMediaKind,
+      sponsorMediaUrl,
+      sponsorMediaExt,
+      sponsorVisible,
     };
   };
 
@@ -645,6 +673,11 @@ export default function FamilyFeud() {
     screen,
     team1Photo,
     team2Photo,
+    sponsorText,
+    sponsorMediaKind,
+    sponsorMediaUrl,
+    sponsorMediaExt,
+    sponsorVisible,
   ]);
 
   // Subscribe to controller actions
@@ -757,6 +790,20 @@ export default function FamilyFeud() {
           setter(msg.payload.url);
           break;
         }
+        case "SET_SPONSOR_TEXT":
+          setSponsorText(msg.payload.text);
+          break;
+        case "SET_SPONSOR_MEDIA":
+          setSponsorMediaKind(msg.payload.kind);
+          setSponsorMediaUrl(msg.payload.url);
+          setSponsorMediaExt(msg.payload.ext);
+          break;
+        case "SHOW_SPONSOR":
+          setSponsorVisible(true);
+          break;
+        case "HIDE_SPONSOR":
+          setSponsorVisible(false);
+          break;
       }
     });
     return off;
@@ -830,11 +877,34 @@ export default function FamilyFeud() {
     reader.readAsText(file);
   };
 
+  // ============ Sponsor / opening screen ============
+  const handleSponsorUpload = async (file: File) => {
+    setSponsorUploading(true);
+    try {
+      const res = await uploadSponsorMedia(file);
+      setSponsorMediaKind(res.kind);
+      setSponsorMediaUrl(res.url);
+      setSponsorMediaExt(res.ext);
+    } catch (e) {
+      alert(e instanceof SponsorMediaError ? e.message : "فشل رفع الملف");
+    } finally {
+      setSponsorUploading(false);
+    }
+  };
+  const handleSponsorClear = async () => {
+    await clearSponsorMedia(sponsorMediaExt);
+    setSponsorMediaKind(null);
+    setSponsorMediaUrl(null);
+    setSponsorMediaExt(null);
+  };
+  const toggleSponsorVisible = () => setSponsorVisible((v) => !v);
+
   // ============ Screens ============
   if (screen === "start") {
     return (
       <div className="min-h-screen bg-dots-start flex flex-col items-center justify-center p-4" dir="rtl">
         {dragDropOverlay}
+        {sponsorOverlay}
         <div className="relative flex flex-col items-center justify-center mb-16 md:scale-125">
           <div className="w-[340px] h-[180px] md:w-[540px] md:h-[270px] bg-gradient-to-b from-[#4774d6] to-[#1d4199] rounded-[100%] border-[4px] md:border-[6px] border-white shadow-[0_0_20px_rgba(0,0,0,0.8),inset_0_0_30px_rgba(0,0,0,0.5)] flex flex-col items-center justify-center relative z-10 outline outline-4 outline-[#dca34b]">
             <h1 className="logo-text text-[44px] md:text-[78px] leading-[1.1] text-center whitespace-nowrap">
@@ -871,6 +941,7 @@ export default function FamilyFeud() {
     return (
       <div className="min-h-screen bg-host text-white p-4 md:p-8" dir="rtl">
         {dragDropOverlay}
+        {sponsorOverlay}
         <div className="max-w-5xl mx-auto flex justify-between items-center mb-6 flex-wrap gap-3">
           <button
             onClick={() => setScreen("start")}
@@ -1097,7 +1168,88 @@ export default function FamilyFeud() {
               </div>
             </div>
 
-
+            {/* Sponsor / opening screen */}
+            <div className="host-card p-4 md:p-6 rounded-xl mb-6 shadow-xl border-t-4 border-[#22c55e]">
+              <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                <h3 className="text-xl font-bold text-white">🎬 شاشة الافتتاح (الشكر والرعاة)</h3>
+                <span
+                  className={`text-[10px] px-2 py-1 rounded-full font-bold ${
+                    sponsorVisible ? "bg-emerald-700 text-white" : "bg-gray-700 text-gray-300"
+                  }`}
+                >
+                  {sponsorVisible ? "● معروضة الآن على الشاشة" : "غير معروضة"}
+                </span>
+              </div>
+              <p className="text-gray-400 text-xs mb-3">
+                تُعرض على الشاشة الكبيرة قبل بدء اللعبة (أو وقت الاستراحة) — فيديو، صورة، أو رسالة
+                شكر للرعاة والداعمين. تحكّم فيها من هنا أو من جوالك عبر وحدة التحكم.
+              </p>
+              <textarea
+                value={sponsorText}
+                onChange={(e) => setSponsorText(e.target.value)}
+                placeholder="اكتب رسالة الشكر للرعاة والداعمين هنا..."
+                rows={3}
+                className="w-full host-input p-3 rounded mb-3 text-right"
+              />
+              <div className="flex flex-wrap items-center gap-2 mb-3">
+                <label
+                  className={`px-4 py-2 rounded font-bold text-white text-sm cursor-pointer ${
+                    sponsorUploading
+                      ? "bg-gray-600 cursor-wait"
+                      : "bg-[#22c55e] hover:bg-green-600"
+                  }`}
+                >
+                  {sponsorUploading ? "جارٍ الرفع..." : "⬆️ رفع صورة أو فيديو"}
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,video/mp4,video/webm,video/quicktime"
+                    disabled={sponsorUploading}
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) void handleSponsorUpload(f);
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+                {sponsorMediaKind && (
+                  <button
+                    onClick={() => void handleSponsorClear()}
+                    className="px-3 py-2 bg-red-900/60 hover:bg-red-700 rounded text-white text-xs font-bold"
+                  >
+                    ✖ إزالة الملف
+                  </button>
+                )}
+                <span className="text-gray-500 text-[10px]">
+                  صورة حتى 4MB · فيديو حتى 30MB
+                </span>
+              </div>
+              {sponsorMediaKind === "image" && sponsorMediaUrl && (
+                <img
+                  src={sponsorMediaUrl}
+                  alt="معاينة"
+                  className="w-full max-h-40 object-contain rounded-lg border border-gray-700 mb-3 bg-black/40"
+                />
+              )}
+              {sponsorMediaKind === "video" && sponsorMediaUrl && (
+                <video
+                  src={sponsorMediaUrl}
+                  controls
+                  muted
+                  className="w-full max-h-40 rounded-lg border border-gray-700 mb-3 bg-black/40"
+                />
+              )}
+              <button
+                onClick={toggleSponsorVisible}
+                className={`w-full py-3 rounded-lg font-bold text-white text-lg shadow-md ${
+                  sponsorVisible
+                    ? "bg-gray-600 hover:bg-gray-500"
+                    : "bg-[#22c55e] hover:bg-green-600"
+                }`}
+              >
+                {sponsorVisible ? "🙈 إخفاء من الشاشة" : "👁 عرض على الشاشة الآن"}
+              </button>
+            </div>
 
             <div className="host-card p-4 rounded-xl mb-6 flex flex-wrap gap-2">
               <button
@@ -1213,6 +1365,7 @@ export default function FamilyFeud() {
   return (
     <div className="min-h-screen flex flex-col font-sans overflow-hidden bg-[#051024]" dir="rtl">
       {dragDropOverlay}
+        {sponsorOverlay}
       {/* Big timer - top corner so it never covers the logo */}
       <div className="fixed top-[max(0.5rem,env(safe-area-inset-top))] left-2 md:left-4 z-50 pointer-events-none">
         <div
@@ -1643,6 +1796,93 @@ function QRModal({ onClose }: { onClose: () => void }) {
         >
           إغلاق
         </button>
+      </div>
+    </div>
+  );
+}
+
+/** Pre-game / intermission screen: video, image or a thank-you message. */
+function SponsorScreen({
+  kind,
+  url,
+  text,
+}: {
+  kind: "image" | "video" | null;
+  url: string | null;
+  text: string;
+}) {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [needsSoundTap, setNeedsSoundTap] = useState(false);
+
+  useEffect(() => {
+    if (kind !== "video" || !videoRef.current) return;
+    const el = videoRef.current;
+    setNeedsSoundTap(false);
+    el.currentTime = 0;
+    el.muted = false;
+    el.play().catch(() => {
+      // Autoplay-with-sound blocked (common when triggered from another
+      // device) — fall back to muted autoplay and let the host tap to unmute.
+      el.muted = true;
+      setNeedsSoundTap(true);
+      void el.play().catch(() => {});
+    });
+  }, [kind, url]);
+
+  return (
+    <div
+      className="fixed inset-0 z-[70] bg-dots-start flex flex-col items-center justify-center p-4 md:p-10 animate-fade-in"
+      dir="rtl"
+    >
+      <div className="absolute inset-0 bg-black/50" />
+      <div className="relative z-10 flex flex-col items-center gap-6 max-w-5xl w-full animate-scale-in">
+        <div className="bg-gradient-to-b from-[#4774d6] to-[#1d4199] rounded-full border-2 md:border-[3px] border-[#dca34b] shadow-xl px-8 py-3">
+          <span className="logo-text text-2xl md:text-4xl">حارة البطل</span>
+        </div>
+
+        {kind === "video" && url && (
+          <div className="w-full max-w-3xl rounded-2xl overflow-hidden border-4 border-[#dca34b] shadow-2xl bg-black relative">
+            <video
+              ref={videoRef}
+              src={url}
+              controls
+              playsInline
+              className="w-full max-h-[60vh] bg-black"
+            />
+            {needsSoundTap && (
+              <button
+                onClick={() => {
+                  if (videoRef.current) {
+                    videoRef.current.muted = false;
+                    void videoRef.current.play();
+                  }
+                  setNeedsSoundTap(false);
+                }}
+                className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/70 hover:bg-black/90 text-white text-sm font-bold px-4 py-2 rounded-full border border-white/40"
+              >
+                🔊 اضغط لتشغيل الصوت
+              </button>
+            )}
+          </div>
+        )}
+
+        {kind === "image" && url && (
+          <img
+            src={url}
+            alt=""
+            className="max-w-full max-h-[55vh] object-contain rounded-2xl border-4 border-[#dca34b] shadow-2xl"
+          />
+        )}
+
+        {text.trim() && (
+          <p className="win-pulse text-center text-white font-bold text-xl md:text-3xl leading-relaxed max-w-3xl whitespace-pre-wrap drop-shadow-[0_4px_8px_rgba(0,0,0,0.9)]">
+            {text}
+          </p>
+        )}
+
+        {!url && !text.trim() && (
+          <p className="text-gray-300 text-lg">لم تتم إضافة محتوى بعد — أضفه من لوحة التحكم</p>
+        )}
       </div>
     </div>
   );
