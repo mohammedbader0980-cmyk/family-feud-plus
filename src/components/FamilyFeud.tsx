@@ -1583,10 +1583,15 @@ export default function FamilyFeud() {
 
 function QRModal({ onClose }: { onClose: () => void }) {
   const [url, setUrl] = useState("/controller");
+  const [qrSrc, setQrSrc] = useState<string | null>(null);
   useEffect(() => {
-    setUrl(`${window.location.origin}/controller?session=${getSessionId()}`);
+    const link = `${window.location.origin}/controller?session=${getSessionId()}&t=${encodeURIComponent(getSessionToken())}`;
+    setUrl(link);
+    // Rendered locally so the private session key never leaves the device.
+    void import("qrcode").then((QR) =>
+      QR.toDataURL(link, { width: 260, margin: 1 }).then(setQrSrc).catch(() => {}),
+    );
   }, []);
-  const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(url)}`;
   const [copied, setCopied] = useState(false);
   const copy = async () => {
     try {
