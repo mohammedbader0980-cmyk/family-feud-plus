@@ -1,9 +1,9 @@
 // Cross-device sync via Supabase Realtime broadcast.
 // Channel "feud-control" - public access, no auth required.
-
+ 
 import { supabase } from "@/integrations/supabase/client";
 import type { RealtimeChannel } from "@supabase/supabase-js";
-
+ 
 export type ControllerAction =
   | { action: "REVEAL_ANSWER"; payload: { index: number } }
   | { action: "REVEAL_ALL" }
@@ -32,8 +32,16 @@ export type ControllerAction =
   | { action: "TOGGLE_LOOP" }
   | { action: "DELETE_TRACK"; payload: { id: string } }
   | { action: "TRACKS_UPDATED" }
-  | { action: "SET_TEAM_PHOTO"; payload: { team: 1 | 2; url: string | null } };
-
+  | { action: "SET_TEAM_PHOTO"; payload: { team: 1 | 2; url: string | null } }
+  // Sponsor / opening screen (video, image or text) — shown/hidden on demand
+  | { action: "SET_SPONSOR_TEXT"; payload: { text: string } }
+  | {
+      action: "SET_SPONSOR_MEDIA";
+      payload: { kind: "image" | "video" | null; url: string | null; ext: string | null };
+    }
+  | { action: "SHOW_SPONSOR" }
+  | { action: "HIDE_SPONSOR" };
+ 
 export type DisplayState = {
   action: "STATE";
   payload: {
@@ -60,11 +68,16 @@ export type DisplayState = {
     onGameScreen: boolean;
     team1Photo: string | null;
     team2Photo: string | null;
+    sponsorText: string;
+    sponsorMediaKind: "image" | "video" | null;
+    sponsorMediaUrl: string | null;
+    sponsorMediaExt: string | null;
+    sponsorVisible: boolean;
   };
 };
-
+ 
 export type SyncMessage = ControllerAction | DisplayState;
-
+ 
 const roomName = () => {
   if (typeof window === "undefined") return "feud-control";
   const fromUrl = new URLSearchParams(window.location.search).get("session");
@@ -83,27 +96,27 @@ const roomName = () => {
   return id ? `feud-control-${id}` : "feud-control";
 };
 const EVENT = "sync";
-
+ 
 const SENDER_ID =
   typeof crypto !== "undefined" && "randomUUID" in crypto
     ? crypto.randomUUID()
     : Math.random().toString(36).slice(2);
-
+ 
 type Listener = (msg: SyncMessage) => void;
-
+ 
 let channel: RealtimeChannel | null = null;
 let channelReady = false;
 const pendingSends: SyncMessage[] = [];
 const listeners = new Set<Listener>();
-
+ 
 const ensureChannel = (): RealtimeChannel | null => {
   if (typeof window === "undefined") return null;
   if (channel) return channel;
-
+ 
   channel = supabase.channel(roomName(), {
     config: { broadcast: { self: false, ack: false } },
   });
-
+ 
   channel.on("broadcast", { event: EVENT }, (msg) => {
     const data = msg.payload as { sender: string; body: SyncMessage } | undefined;
     if (!data || data.sender === SENDER_ID) return;
@@ -115,7 +128,7 @@ const ensureChannel = (): RealtimeChannel | null => {
       }
     });
   });
-
+ 
   channel.subscribe((status) => {
     if (status === "SUBSCRIBED") {
       channelReady = true;
@@ -123,10 +136,10 @@ const ensureChannel = (): RealtimeChannel | null => {
       queued.forEach((m) => sendMessage(m));
     }
   });
-
+ 
   return channel;
 };
-
+ 
 export const sendMessage = (msg: SyncMessage) => {
   const ch = ensureChannel();
   if (!ch) return;
@@ -140,7 +153,7 @@ export const sendMessage = (msg: SyncMessage) => {
     payload: { sender: SENDER_ID, body: msg },
   }).catch((e) => console.error("[feud-sync] send failed", e));
 };
-
+ 
 export const subscribe = (handler: Listener): (() => void) => {
   if (typeof window === "undefined") return () => {};
   ensureChannel();
@@ -149,3 +162,4 @@ export const subscribe = (handler: Listener): (() => void) => {
     listeners.delete(handler);
   };
 };
+ 
