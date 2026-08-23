@@ -1,13 +1,18 @@
-// Server-only helpers backing the feud server functions.
+/ Server-only helpers backing the feud server functions.
 // All access is gated on a per-session token held by the host device.
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-
+ 
 const TABLE = "game_sessions";
 export const MUSIC_BUCKET = "feud-music";
 export const PHOTO_BUCKET = "team-photos";
-
+// Sponsor/opening-screen media (image or video) is stored under a "sponsor/"
+// prefix inside the existing feud-music bucket instead of a brand new bucket —
+// that bucket already accepts arbitrary file types and this avoids depending
+// on a fresh bucket + storage policies being provisioned before it's needed.
+export const SPONSOR_BUCKET = MUSIC_BUCKET;
+ 
 export class SessionAuthError extends Error {}
-
+ 
 /** Verify the session token; optionally create the session on first write. */
 export async function authorizeSession(
   sessionId: string,
@@ -20,7 +25,7 @@ export async function authorizeSession(
     .eq("id", sessionId)
     .maybeSingle();
   if (error) throw new SessionAuthError("session lookup failed");
-
+ 
   if (!data) {
     if (!create) return "missing";
     const { error: insertError } = await supabaseAdmin
@@ -32,11 +37,11 @@ export async function authorizeSession(
     }
     return "ok";
   }
-
+ 
   if (data.token !== token) throw new SessionAuthError("invalid session token");
   return "ok";
 }
-
+ 
 export async function readSessionState(sessionId: string, token: string) {
   const status = await authorizeSession(sessionId, token, false);
   if (status === "missing") return null;
@@ -47,7 +52,7 @@ export async function readSessionState(sessionId: string, token: string) {
     .maybeSingle();
   return (data?.state as Record<string, unknown> | undefined) ?? null;
 }
-
+ 
 export async function writeSessionState(
   sessionId: string,
   token: string,
@@ -61,7 +66,7 @@ export async function writeSessionState(
     .eq("token", token);
   if (error) throw new SessionAuthError("save failed");
 }
-
+ 
 export async function listMusicTracks() {
   const { data, error } = await supabaseAdmin.storage.from(MUSIC_BUCKET).list("", {
     limit: 200,
@@ -79,7 +84,7 @@ export async function listMusicTracks() {
   }
   return out;
 }
-
+ 
 export async function createUpload(bucket: string, path: string, upsert: boolean) {
   const { data, error } = await supabaseAdmin.storage
     .from(bucket)
@@ -87,12 +92,13 @@ export async function createUpload(bucket: string, path: string, upsert: boolean
   if (error || !data) throw new SessionAuthError("could not prepare upload");
   return { path, token: data.token };
 }
-
+ 
 export async function signObject(bucket: string, path: string, seconds: number) {
   const { data } = await supabaseAdmin.storage.from(bucket).createSignedUrl(path, seconds);
   return data?.signedUrl ?? null;
 }
-
+ 
 export async function removeObject(bucket: string, path: string) {
   await supabaseAdmin.storage.from(bucket).remove([path]);
 }
+ 
