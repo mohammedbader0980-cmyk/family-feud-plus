@@ -17,8 +17,9 @@ import {
 } from "@/lib/music-db";
 import { sendMessage, subscribe, type SyncMessage } from "@/lib/feud-sync";
 import { Typewriter, CountUp, Confetti } from "@/components/feud-fx";
-import { getSessionId, saveSessionState } from "@/lib/feud-session";
-import { supabase } from "@/integrations/supabase/client";
+import { getSessionId, getSessionToken, saveSessionState, sessionAuth } from "@/lib/feud-session";
+import { deleteMusicFn, listMusicFn } from "@/lib/feud-api.functions";
+import { signTeamPhotoUrl } from "@/lib/team-photo-upload";
 import {
   uploadTeamPhotoBlob,
   TeamPhotoError,
@@ -33,44 +34,18 @@ type Track = {
   storagePath?: string;
 };
 
-const MUSIC_BUCKET = "feud-music";
-const PHOTO_BUCKET = "team-photos";
-
-const teamPhotoFile = (team: 1 | 2) => `team${team}.jpg`;
-const signTeamPhoto = async (team: 1 | 2): Promise<string | null> => {
-  try {
-    const { data } = await supabase.storage
-      .from(PHOTO_BUCKET)
-      .createSignedUrl(teamPhotoFile(team), 60 * 60 * 24 * 365);
-    return data?.signedUrl ?? null;
-  } catch {
-    return null;
-  }
-};
+const signTeamPhoto = (team: 1 | 2): Promise<string | null> => signTeamPhotoUrl(team);
 
 const loadStorageTracks = async (): Promise<Track[]> => {
   try {
-    const { data, error } = await supabase.storage.from(MUSIC_BUCKET).list("", {
-      limit: 200,
-      sortBy: { column: "created_at", order: "asc" },
-    });
-    if (error || !data) return [];
-    const tracks: Track[] = [];
-    for (const f of data) {
-      if (!f.name || f.name.startsWith(".")) continue;
-      const { data: signed } = await supabase.storage
-        .from(MUSIC_BUCKET)
-        .createSignedUrl(f.name, 60 * 60 * 24 * 7);
-      if (!signed?.signedUrl) continue;
-      tracks.push({
-        id: `storage-${f.name}`,
-        name: f.name.replace(/^\d+-/, ""),
-        url: signed.signedUrl,
-        source: "storage",
-        storagePath: f.name,
-      });
-    }
-    return tracks;
+    const { tracks } = await listMusicFn({ data: sessionAuth() });
+    return tracks.map((t) => ({
+      id: `storage-${t.path}`,
+      name: t.name,
+      url: t.url,
+      source: "storage" as const,
+      storagePath: t.path,
+    }));
   } catch (e) {
     console.error("[music] storage list failed", e);
     return [];
@@ -400,7 +375,7 @@ export default function FamilyFeud() {
         await idbDeleteTrack(target.id.replace(/^local-/, ""));
         URL.revokeObjectURL(target.url);
       } else if (target.source === "storage" && target.storagePath) {
-        await supabase.storage.from(MUSIC_BUCKET).remove([target.storagePath]);
+        await deleteMusicFn({ data: { ...sessionAuth(), path: target.storagePath } });
       }
     } catch (e) {
       console.error("Failed to delete track", e);
@@ -1608,10 +1583,15 @@ export default function FamilyFeud() {
 
 function QRModal({ onClose }: { onClose: () => void }) {
   const [url, setUrl] = useState("/controller");
+  const [qrSrc, setQrSrc] = useState<string | null>(null);
   useEffect(() => {
-    setUrl(`${window.location.origin}/controller?session=${getSessionId()}`);
+    const link = `${window.location.origin}/controller?session=${getSessionId()}&t=${encodeURIComponent(getSessionToken())}`;
+    setUrl(link);
+    // Rendered locally so the private session key never leaves the device.
+    void import("qrcode").then((QR) =>
+      QR.toDataURL(link, { width: 260, margin: 1 }).then(setQrSrc).catch(() => {}),
+    );
   }, []);
-  const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(url)}`;
   const [copied, setCopied] = useState(false);
   const copy = async () => {
     try {
@@ -1637,7 +1617,11 @@ function QRModal({ onClose }: { onClose: () => void }) {
           امسح الرمز بالجوال لفتح وحدة التحكم — بدون تسجيل دخول
         </p>
         <div className="bg-white p-3 rounded-xl inline-block mb-4">
-          <img src={qrSrc} alt="QR" width={220} height={220} />
+          {qrSrc ? (
+            <img src={qrSrc} alt="QR" width={220} height={220} />
+          ) : (
+            <div className="w-[220px] h-[220px]" />
+          )}
         </div>
         <div className="flex gap-2 mb-3">
           <input
