@@ -10,14 +10,15 @@ export const loadSessionFn = createServerFn({ method: "POST" })
   .inputValidator(sessionInput)
   .handler(async ({ data }) => {
     const { readSessionState } = await import("./feud-api.server");
-    return { state: await readSessionState(data.sessionId, data.token) };
+    const state = await readSessionState(data.sessionId, data.token);
+    return { stateJson: state ? JSON.stringify(state) : null };
   });
 
 export const saveSessionFn = createServerFn({ method: "POST" })
-  .inputValidator(sessionInput.extend({ state: z.unknown() }))
+  .inputValidator(sessionInput.extend({ stateJson: z.string().max(2_000_000) }))
   .handler(async ({ data }) => {
     const { writeSessionState } = await import("./feud-api.server");
-    await writeSessionState(data.sessionId, data.token, data.state);
+    await writeSessionState(data.sessionId, data.token, JSON.parse(data.stateJson));
     return { ok: true };
   });
 

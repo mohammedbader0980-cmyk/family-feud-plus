@@ -107,7 +107,7 @@ export const saveSessionState = (state: SessionState) => {
     const body = pending;
     pending = null;
     if (!body) return;
-    void saveSessionFn({ data: { ...sessionAuth(), state: body } }).catch((e) =>
+    void saveSessionFn({ data: { ...sessionAuth(), stateJson: JSON.stringify(body) } }).catch((e) =>
       console.warn("[feud-session] save failed", e),
     );
   }, 600);
@@ -117,7 +117,7 @@ export const saveSessionState = (state: SessionState) => {
 export const loadSessionState = async (): Promise<SessionState | null> => {
   try {
     const res = await loadSessionFn({ data: sessionAuth() });
-    const state = res?.state as SessionState | undefined;
+    const state = res?.stateJson ? (JSON.parse(res.stateJson) as SessionState) : undefined;
     if (!state || typeof state !== "object" || !("team1Score" in state)) return null;
     return state;
   } catch (e) {
