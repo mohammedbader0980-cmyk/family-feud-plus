@@ -1,15 +1,26 @@
 // Session identity + durable state persistence for the game.
 // A session id ties the display screen and any controller devices together.
+// A private session token authorizes all database/storage access (server-side).
 
-import { supabase } from "@/integrations/supabase/client";
+import { loadSessionFn, saveSessionFn } from "@/lib/feud-api.functions";
 import type { DisplayState } from "@/lib/feud-sync";
 
 const STORAGE_KEY = "feud-session-id";
-const TABLE = "game_sessions";
+const TOKEN_KEY = "feud-session-token";
 
 const makeId = () => Math.random().toString(36).slice(2, 8).toUpperCase();
 
+const makeToken = () => {
+  if (typeof crypto !== "undefined" && "getRandomValues" in crypto) {
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  }
+  return `${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`;
+};
+
 let cached: string | null = null;
+let cachedToken: string | null = null;
 
 /** Session id from ?session= in the URL, else a stable id stored on this device. */
 export const getSessionId = (): string => {
@@ -40,12 +51,53 @@ export const getSessionId = (): string => {
   return cached;
 };
 
+/** Private key that authorizes access to this session's data. */
+export const getSessionToken = (): string => {
+  if (cachedToken) return cachedToken;
+  if (typeof window === "undefined") return "";
+
+  const fromUrl = new URLSearchParams(window.location.search).get("t");
+  if (fromUrl && fromUrl.trim()) {
+    cachedToken = fromUrl.trim();
+    try {
+      window.localStorage.setItem(`${TOKEN_KEY}:${getSessionId()}`, cachedToken);
+    } catch {
+      /* ignore */
+    }
+    return cachedToken;
+  }
+
+  const key = `${TOKEN_KEY}:${getSessionId()}`;
+  let stored: string | null = null;
+  try {
+    stored = window.localStorage.getItem(key);
+  } catch {
+    /* ignore */
+  }
+  if (!stored) {
+    stored = makeToken();
+    try {
+      window.localStorage.setItem(key, stored);
+    } catch {
+      /* ignore */
+    }
+  }
+  cachedToken = stored;
+  return cachedToken;
+};
+
+/** Credentials for the server functions guarding session data. */
+export const sessionAuth = () => ({
+  sessionId: getSessionId(),
+  token: getSessionToken(),
+});
+
 export type SessionState = DisplayState["payload"];
 
 let saveTimer: number | null = null;
 let pending: SessionState | null = null;
 
-/** Debounced upsert of the latest snapshot into the database. */
+/** Debounced save of the latest snapshot through the secured server function. */
 export const saveSessionState = (state: SessionState) => {
   if (typeof window === "undefined") return;
   pending = state;
@@ -55,27 +107,21 @@ export const saveSessionState = (state: SessionState) => {
     const body = pending;
     pending = null;
     if (!body) return;
-    void supabase
-      .from(TABLE)
-      .upsert({ id: getSessionId(), state: body as never }, { onConflict: "id" })
-      .then(({ error }) => {
-        if (error) console.warn("[feud-session] save failed", error.message);
-      });
+    void saveSessionFn({ data: { ...sessionAuth(), state: body } }).catch((e) =>
+      console.warn("[feud-session] save failed", e),
+    );
   }, 600);
 };
 
 /** Last saved snapshot for this session, or null when none exists yet. */
 export const loadSessionState = async (): Promise<SessionState | null> => {
-  const { data, error } = await supabase
-    .from(TABLE)
-    .select("state")
-    .eq("id", getSessionId())
-    .maybeSingle();
-  if (error) {
-    console.warn("[feud-session] load failed", error.message);
+  try {
+    const res = await loadSessionFn({ data: sessionAuth() });
+    const state = res?.state as SessionState | undefined;
+    if (!state || typeof state !== "object" || !("team1Score" in state)) return null;
+    return state;
+  } catch (e) {
+    console.warn("[feud-session] load failed", e);
     return null;
   }
-  const state = data?.state as SessionState | undefined;
-  if (!state || typeof state !== "object" || !("team1Score" in state)) return null;
-  return state;
 };

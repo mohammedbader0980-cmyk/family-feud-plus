@@ -1,5 +1,7 @@
-import { supabase } from "@/integrations/supabase/client";
+import { createPhotoUploadFn, deletePhotoFn, signPhotoFn } from "@/lib/feud-api.functions";
+import { sessionAuth } from "@/lib/feud-session";
 import { sendMessage } from "@/lib/feud-sync";
+import { supabase } from "@/integrations/supabase/client";
 
 const PHOTO_BUCKET = "team-photos";
 
@@ -34,6 +36,35 @@ export const cropToSquareJpeg = (file: File): Promise<Blob> =>
     reader.readAsDataURL(file);
   });
 
+/** Signed URL for a team's photo, or null when there is none. */
+export async function signTeamPhotoUrl(team: 1 | 2): Promise<string | null> {
+  try {
+    const { url } = await signPhotoFn({ data: { ...sessionAuth(), team } });
+    return url ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function putTeamPhoto(team: 1 | 2, blob: Blob): Promise<string> {
+  const upload = await createPhotoUploadFn({ data: { ...sessionAuth(), team } }).catch(
+    () => null,
+  );
+  if (!upload) throw new TeamPhotoError("تعذّر تجهيز الرفع");
+  const { error } = await supabase.storage
+    .from(PHOTO_BUCKET)
+    .uploadToSignedUrl(upload.path, upload.token, blob, {
+      contentType: "image/jpeg",
+      upsert: true,
+    });
+  if (error) throw new TeamPhotoError("تعذّر رفع الصورة: " + error.message);
+  const signed = await signTeamPhotoUrl(team);
+  if (!signed) throw new TeamPhotoError("تعذّر توليد رابط الصورة");
+  const url = `${signed}&v=${Date.now()}`;
+  sendMessage({ action: "SET_TEAM_PHOTO", payload: { team, url } });
+  return url;
+}
+
 export async function uploadTeamPhoto(team: 1 | 2, file: File): Promise<string> {
   if (!/^image\/(jpe?g|png)$/i.test(file.type)) {
     throw new TeamPhotoError("الصورة يجب أن تكون JPG أو PNG");
@@ -42,39 +73,17 @@ export async function uploadTeamPhoto(team: 1 | 2, file: File): Promise<string> 
     throw new TeamPhotoError("حجم الصورة يجب أن يكون أقل من 2 ميجابايت");
   }
   const cropped = await cropToSquareJpeg(file);
-  const path = `team${team}.jpg`;
-  const { error } = await supabase.storage
-    .from(PHOTO_BUCKET)
-    .upload(path, cropped, { contentType: "image/jpeg", upsert: true });
-  if (error) throw new TeamPhotoError("تعذّر رفع الصورة: " + error.message);
-  const { data: signed } = await supabase.storage
-    .from(PHOTO_BUCKET)
-    .createSignedUrl(path, 60 * 60 * 24 * 365);
-  if (!signed?.signedUrl) throw new TeamPhotoError("تعذّر توليد رابط الصورة");
-  const url = `${signed.signedUrl}&v=${Date.now()}`;
-  sendMessage({ action: "SET_TEAM_PHOTO", payload: { team, url } });
-  return url;
+  return putTeamPhoto(team, cropped);
 }
 
 export async function uploadTeamPhotoBlob(team: 1 | 2, blob: Blob): Promise<string> {
   if (blob.size > 4 * 1024 * 1024) {
     throw new TeamPhotoError("الصورة كبيرة جداً بعد القص");
   }
-  const path = `team${team}.jpg`;
-  const { error } = await supabase.storage
-    .from(PHOTO_BUCKET)
-    .upload(path, blob, { contentType: "image/jpeg", upsert: true });
-  if (error) throw new TeamPhotoError("تعذّر رفع الصورة: " + error.message);
-  const { data: signed } = await supabase.storage
-    .from(PHOTO_BUCKET)
-    .createSignedUrl(path, 60 * 60 * 24 * 365);
-  if (!signed?.signedUrl) throw new TeamPhotoError("تعذّر توليد رابط الصورة");
-  const url = `${signed.signedUrl}&v=${Date.now()}`;
-  sendMessage({ action: "SET_TEAM_PHOTO", payload: { team, url } });
-  return url;
+  return putTeamPhoto(team, blob);
 }
 
 export async function deleteTeamPhoto(team: 1 | 2): Promise<void> {
-  await supabase.storage.from(PHOTO_BUCKET).remove([`team${team}.jpg`]);
+  await deletePhotoFn({ data: { ...sessionAuth(), team } }).catch(() => null);
   sendMessage({ action: "SET_TEAM_PHOTO", payload: { team, url: null } });
 }
