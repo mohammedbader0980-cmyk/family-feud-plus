@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+شimport { useEffect, useRef, useState } from "react";
 import { sendMessage, subscribe, type DisplayState, type SyncMessage } from "@/lib/feud-sync";
 import { getSessionId, loadSessionState, sessionAuth } from "@/lib/feud-session";
 import { createMusicUploadFn } from "@/lib/feud-api.functions";
@@ -9,6 +9,7 @@ import {
   TeamPhotoError,
 } from "@/lib/team-photo-upload";
 import TeamPhotoCropper from "@/components/TeamPhotoCropper";
+import { uploadSponsorMedia, clearSponsorMedia, SponsorMediaError } from "@/lib/sponsor-media";
 
 type State = DisplayState["payload"];
 
@@ -38,6 +39,11 @@ const defaultState: State = {
   onGameScreen: false,
   team1Photo: null,
   team2Photo: null,
+  sponsorText: "",
+  sponsorMediaKind: null,
+  sponsorMediaUrl: null,
+  sponsorMediaExt: null,
+  sponsorVisible: false,
 };
 
 const btnBase =
@@ -169,6 +175,29 @@ export default function FeudController() {
     await deleteTeamPhotoLib(team);
   };
 
+  // ===== Sponsor / opening screen =====
+  const [sponsorDraft, setSponsorDraft] = useState<string | null>(null);
+  const [sponsorUploading, setSponsorUploading] = useState(false);
+  const sponsorTextValue = sponsorDraft ?? state.sponsorText;
+  const saveSponsorText = () => {
+    if (sponsorDraft === null || sponsorDraft === state.sponsorText) return;
+    send({ action: "SET_SPONSOR_TEXT", payload: { text: sponsorDraft } });
+    setSponsorDraft(null);
+  };
+  const uploadSponsor = async (file: File) => {
+    setSponsorUploading(true);
+    try {
+      await uploadSponsorMedia(file);
+    } catch (e) {
+      alert(e instanceof SponsorMediaError ? e.message : "فشل رفع الملف");
+    } finally {
+      setSponsorUploading(false);
+    }
+  };
+  const clearSponsor = async () => {
+    await clearSponsorMedia(state.sponsorMediaExt);
+  };
+
 
 
 
@@ -214,6 +243,68 @@ export default function FeudController() {
               ⏱ {fmtTimer} {state.timerRunning ? "(يعمل)" : ""}
             </span>
           </div>
+        </div>
+
+        {/* ============ SPONSOR / OPENING SCREEN ============ */}
+        <div className="rounded-2xl bg-card border-2 border-emerald-700/40 p-3 shadow-lg">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-bold text-emerald-300">🎬 شاشة الافتتاح والرعاة</h3>
+            <span
+              className={`text-[10px] px-2 py-1 rounded-full font-bold ${
+                state.sponsorVisible ? "bg-emerald-700 text-white" : "bg-gray-700 text-gray-200"
+              }`}
+            >
+              {state.sponsorVisible ? "● معروضة" : "مخفية"}
+            </span>
+          </div>
+          <textarea
+            value={sponsorTextValue}
+            onChange={(e) => setSponsorDraft(e.target.value)}
+            onBlur={saveSponsorText}
+            placeholder="رسالة شكر للرعاة والداعمين..."
+            rows={2}
+            className="w-full rounded-lg bg-secondary px-3 py-2 text-sm mb-2"
+          />
+          <div className="flex flex-wrap gap-2 mb-2">
+            <label
+              className={`flex-1 text-center px-3 py-2 rounded-lg font-bold text-white text-xs cursor-pointer ${
+                sponsorUploading
+                  ? "bg-gray-600 cursor-wait"
+                  : "bg-emerald-700 hover:bg-emerald-600 active:scale-95"
+              }`}
+            >
+              {sponsorUploading ? "جارٍ الرفع..." : "⬆️ رفع صورة/فيديو"}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,video/mp4,video/webm,video/quicktime"
+                disabled={sponsorUploading}
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) void uploadSponsor(f);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+            {state.sponsorMediaKind && (
+              <button
+                onClick={() => void clearSponsor()}
+                className="px-3 py-2 rounded-lg bg-red-900/60 hover:bg-red-700 text-white text-xs font-bold"
+              >
+                ✖ إزالة
+              </button>
+            )}
+          </div>
+          <button
+            onClick={() =>
+              send({ action: state.sponsorVisible ? "HIDE_SPONSOR" : "SHOW_SPONSOR" })
+            }
+            className={`${btnBase} w-full ${
+              state.sponsorVisible ? colors.gray : colors.green
+            }`}
+          >
+            {state.sponsorVisible ? "🙈 إخفاء من الشاشة" : "👁 عرض على الشاشة الآن"}
+          </button>
         </div>
 
         {/* ============ ANSWER CHEAT SHEET ============ */}
