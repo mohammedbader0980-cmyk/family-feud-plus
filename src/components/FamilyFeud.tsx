@@ -17,8 +17,9 @@ import {
 } from "@/lib/music-db";
 import { sendMessage, subscribe, type SyncMessage } from "@/lib/feud-sync";
 import { Typewriter, CountUp, Confetti } from "@/components/feud-fx";
-import { getSessionId, saveSessionState } from "@/lib/feud-session";
-import { supabase } from "@/integrations/supabase/client";
+import { getSessionId, getSessionToken, saveSessionState, sessionAuth } from "@/lib/feud-session";
+import { deleteMusicFn, listMusicFn } from "@/lib/feud-api.functions";
+import { signTeamPhotoUrl } from "@/lib/team-photo-upload";
 import {
   uploadTeamPhotoBlob,
   TeamPhotoError,
