@@ -1617,7 +1617,11 @@ function QRModal({ onClose }: { onClose: () => void }) {
           امسح الرمز بالجوال لفتح وحدة التحكم — بدون تسجيل دخول
         </p>
         <div className="bg-white p-3 rounded-xl inline-block mb-4">
-          <img src={qrSrc} alt="QR" width={220} height={220} />
+          {qrSrc ? (
+            <img src={qrSrc} alt="QR" width={220} height={220} />
+          ) : (
+            <div className="w-[220px] h-[220px]" />
+          )}
         </div>
         <div className="flex gap-2 mb-3">
           <input
