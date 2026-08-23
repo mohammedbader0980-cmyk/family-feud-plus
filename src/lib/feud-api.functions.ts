@@ -1,11 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-
+ 
 const sessionInput = z.object({
   sessionId: z.string().min(1).max(64),
   token: z.string().min(8).max(128),
 });
-
+ 
 export const loadSessionFn = createServerFn({ method: "POST" })
   .inputValidator(sessionInput)
   .handler(async ({ data }) => {
@@ -13,7 +13,7 @@ export const loadSessionFn = createServerFn({ method: "POST" })
     const state = await readSessionState(data.sessionId, data.token);
     return { stateJson: state ? JSON.stringify(state) : null };
   });
-
+ 
 export const saveSessionFn = createServerFn({ method: "POST" })
   .inputValidator(sessionInput.extend({ stateJson: z.string().max(2_000_000) }))
   .handler(async ({ data }) => {
@@ -21,7 +21,7 @@ export const saveSessionFn = createServerFn({ method: "POST" })
     await writeSessionState(data.sessionId, data.token, JSON.parse(data.stateJson));
     return { ok: true };
   });
-
+ 
 export const listMusicFn = createServerFn({ method: "POST" })
   .inputValidator(sessionInput)
   .handler(async ({ data }) => {
@@ -29,7 +29,7 @@ export const listMusicFn = createServerFn({ method: "POST" })
     await authorizeSession(data.sessionId, data.token, true);
     return { tracks: await listMusicTracks() };
   });
-
+ 
 export const createMusicUploadFn = createServerFn({ method: "POST" })
   .inputValidator(sessionInput.extend({ fileName: z.string().min(1).max(120) }))
   .handler(async ({ data }) => {
@@ -40,7 +40,7 @@ export const createMusicUploadFn = createServerFn({ method: "POST" })
     const safe = data.fileName.replace(/[^\w.\-]+/g, "_");
     return createUpload(MUSIC_BUCKET, `${Date.now()}-${safe}`, false);
   });
-
+ 
 export const deleteMusicFn = createServerFn({ method: "POST" })
   .inputValidator(sessionInput.extend({ path: z.string().min(1).max(200) }))
   .handler(async ({ data }) => {
@@ -52,7 +52,7 @@ export const deleteMusicFn = createServerFn({ method: "POST" })
     await removeObject(MUSIC_BUCKET, data.path);
     return { ok: true };
   });
-
+ 
 export const createPhotoUploadFn = createServerFn({ method: "POST" })
   .inputValidator(sessionInput.extend({ team: z.union([z.literal(1), z.literal(2)]) }))
   .handler(async ({ data }) => {
@@ -62,7 +62,7 @@ export const createPhotoUploadFn = createServerFn({ method: "POST" })
     await authorizeSession(data.sessionId, data.token, true);
     return createUpload(PHOTO_BUCKET, `team${data.team}.jpg`, true);
   });
-
+ 
 export const signPhotoFn = createServerFn({ method: "POST" })
   .inputValidator(sessionInput.extend({ team: z.union([z.literal(1), z.literal(2)]) }))
   .handler(async ({ data }) => {
@@ -72,7 +72,7 @@ export const signPhotoFn = createServerFn({ method: "POST" })
     await authorizeSession(data.sessionId, data.token, true);
     return { url: await signObject(PHOTO_BUCKET, `team${data.team}.jpg`, 60 * 60 * 24) };
   });
-
+ 
 export const deletePhotoFn = createServerFn({ method: "POST" })
   .inputValidator(sessionInput.extend({ team: z.union([z.literal(1), z.literal(2)]) }))
   .handler(async ({ data }) => {
@@ -83,3 +83,38 @@ export const deletePhotoFn = createServerFn({ method: "POST" })
     await removeObject(PHOTO_BUCKET, `team${data.team}.jpg`);
     return { ok: true };
   });
+ 
+const sponsorExt = z.enum(["jpg", "png", "mp4", "webm", "mov"]);
+ 
+export const createSponsorUploadFn = createServerFn({ method: "POST" })
+  .inputValidator(sessionInput.extend({ ext: sponsorExt }))
+  .handler(async ({ data }) => {
+    const { authorizeSession, createUpload, SPONSOR_BUCKET } = await import(
+      "./feud-api.server"
+    );
+    await authorizeSession(data.sessionId, data.token, true);
+    return createUpload(SPONSOR_BUCKET, `sponsor/media.${data.ext}`, true);
+  });
+ 
+export const signSponsorFn = createServerFn({ method: "POST" })
+  .inputValidator(sessionInput.extend({ ext: sponsorExt }))
+  .handler(async ({ data }) => {
+    const { authorizeSession, signObject, SPONSOR_BUCKET } = await import(
+      "./feud-api.server"
+    );
+    await authorizeSession(data.sessionId, data.token, true);
+    return { url: await signObject(SPONSOR_BUCKET, `sponsor/media.${data.ext}`, 60 * 60 * 24) };
+  });
+ 
+export const deleteSponsorFn = createServerFn({ method: "POST" })
+  .inputValidator(sessionInput.extend({ ext: sponsorExt }))
+  .handler(async ({ data }) => {
+    const { authorizeSession, removeObject, SPONSOR_BUCKET } = await import(
+      "./feud-api.server"
+    );
+    await authorizeSession(data.sessionId, data.token, true);
+    await removeObject(SPONSOR_BUCKET, `sponsor/media.${data.ext}`);
+    return { ok: true };
+  });
+ 
+
