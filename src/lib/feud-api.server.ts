@@ -1,4 +1,4 @@
-/ Server-only helpers backing the feud server functions.
+// Server-only helpers backing the feud server functions.
 // All access is gated on a per-session token held by the host device.
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
  
