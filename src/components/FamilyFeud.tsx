@@ -1219,7 +1219,7 @@ export default function FamilyFeud() {
                   {sponsorUploading ? "جارٍ الرفع..." : "⬆️ رفع صورة أو فيديو"}
                   <input
                     type="file"
-                    accept="image/jpeg,image/png,video/mp4,video/webm,video/quicktime"
+                    accept="image/*,video/*"
                     disabled={sponsorUploading}
                     className="hidden"
                     onChange={(e) => {
