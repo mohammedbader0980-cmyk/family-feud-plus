@@ -1221,8 +1221,23 @@ export default function FamilyFeud() {
                   </button>
                 )}
                 <span className="text-gray-500 text-[10px]">
-                  صورة حتى 4MB · فيديو حتى 30MB
+                  صورة أو فيديو حتى 50 ميجابايت
                 </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 mb-3">
+                <input
+                  value={sponsorUrlDraft}
+                  onChange={(e) => setSponsorUrlDraft(e.target.value)}
+                  placeholder="أو الصق رابط صورة/فيديو خارجي (https://...)"
+                  className="flex-1 min-w-[220px] host-input p-2 rounded text-right text-sm"
+                  dir="ltr"
+                />
+                <button
+                  onClick={handleSponsorUrl}
+                  className="px-4 py-2 bg-[#1d3d8f] hover:bg-blue-600 rounded font-bold text-white text-sm"
+                >
+                  استخدام الرابط
+                </button>
               </div>
               {sponsorMediaKind === "image" && sponsorMediaUrl && (
                 <img
