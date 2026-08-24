@@ -891,6 +891,17 @@ export default function FamilyFeud() {
       setSponsorUploading(false);
     }
   };
+  const handleSponsorUrl = () => {
+    try {
+      const res = setSponsorMediaUrl(sponsorUrlDraft);
+      setSponsorMediaKind(res.kind);
+      setSponsorMediaUrl(res.url);
+      setSponsorMediaExt(null);
+      setSponsorUrlDraft("");
+    } catch (e) {
+      alert(e instanceof SponsorMediaError ? e.message : "رابط غير صالح");
+    }
+  };
   const handleSponsorClear = async () => {
     await clearSponsorMedia(sponsorMediaExt);
     setSponsorMediaKind(null);
