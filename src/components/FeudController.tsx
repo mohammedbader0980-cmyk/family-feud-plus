@@ -9,7 +9,7 @@ import {
   TeamPhotoError,
 } from "@/lib/team-photo-upload";
 import TeamPhotoCropper from "@/components/TeamPhotoCropper";
-import { uploadSponsorMedia, clearSponsorMedia, SponsorMediaError } from "@/lib/sponsor-media";
+import { uploadSponsorMedia, clearSponsorMedia, setSponsorMediaUrl, SponsorMediaError } from "@/lib/sponsor-media";
 
 type State = DisplayState["payload"];
 
@@ -194,6 +194,15 @@ export default function FeudController() {
       setSponsorUploading(false);
     }
   };
+  const [sponsorUrl, setSponsorUrl] = useState("");
+  const applySponsorUrl = () => {
+    try {
+      setSponsorMediaUrl(sponsorUrl);
+      setSponsorUrl("");
+    } catch (e) {
+      alert(e instanceof SponsorMediaError ? e.message : "رابط غير صالح");
+    }
+  };
   const clearSponsor = async () => {
     await clearSponsorMedia(state.sponsorMediaExt);
   };
@@ -273,10 +282,10 @@ export default function FeudController() {
                   : "bg-emerald-700 hover:bg-emerald-600 active:scale-95"
               }`}
             >
-              {sponsorUploading ? "جارٍ الرفع..." : "⬆️ رفع صورة/فيديو"}
+              {sponsorUploading ? "جارٍ الرفع..." : "⬆️ رفع صورة/فيديو (حتى 50MB)"}
               <input
                 type="file"
-                accept="image/jpeg,image/png,video/mp4,video/webm,video/quicktime"
+                accept="image/*,video/*"
                 disabled={sponsorUploading}
                 className="hidden"
                 onChange={(e) => {
@@ -294,6 +303,21 @@ export default function FeudController() {
                 ✖ إزالة
               </button>
             )}
+          </div>
+          <div className="flex gap-2 mb-2">
+            <input
+              value={sponsorUrl}
+              onChange={(e) => setSponsorUrl(e.target.value)}
+              placeholder="أو رابط خارجي https://..."
+              dir="ltr"
+              className="flex-1 rounded-lg bg-secondary px-3 py-2 text-xs"
+            />
+            <button
+              onClick={applySponsorUrl}
+              className="px-3 py-2 rounded-lg bg-blue-800 hover:bg-blue-700 text-white text-xs font-bold"
+            >
+              استخدام
+            </button>
           </div>
           <button
             onClick={() =>

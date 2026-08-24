@@ -84,7 +84,7 @@ export const deletePhotoFn = createServerFn({ method: "POST" })
     return { ok: true };
   });
  
-const sponsorExt = z.enum(["jpg", "png", "mp4", "webm", "mov"]);
+const sponsorExt = z.enum(["jpg", "png", "webp", "gif", "mp4", "webm", "mov"]);
  
 export const createSponsorUploadFn = createServerFn({ method: "POST" })
   .inputValidator(sessionInput.extend({ ext: sponsorExt }))
