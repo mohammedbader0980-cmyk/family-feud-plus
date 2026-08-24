@@ -28,7 +28,7 @@ import TeamPhotoCropper from "@/components/TeamPhotoCropper";
 import {
   uploadSponsorMedia,
   clearSponsorMedia,
-  setSponsorMediaUrl,
+  setSponsorMediaUrl as broadcastSponsorUrl,
   SponsorMediaError,
 } from "@/lib/sponsor-media";
 
@@ -899,7 +899,7 @@ export default function FamilyFeud() {
   };
   const handleSponsorUrl = () => {
     try {
-      const res = setSponsorMediaUrl(sponsorUrlDraft);
+      const res = broadcastSponsorUrl(sponsorUrlDraft);
       setSponsorMediaKind(res.kind);
       setSponsorMediaUrl(res.url);
       setSponsorMediaExt(null);
