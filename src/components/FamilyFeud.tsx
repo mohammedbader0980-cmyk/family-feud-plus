@@ -96,6 +96,7 @@ export default function FamilyFeud() {
   const [sponsorMediaExt, setSponsorMediaExt] = useState<string | null>(null);
   const [sponsorVisible, setSponsorVisible] = useState(false);
   const [sponsorUploading, setSponsorUploading] = useState(false);
+  const [sponsorUrlDraft, setSponsorUrlDraft] = useState("");
 
   // Load persisted state from localStorage AFTER mount (avoid SSR overwriting)
   useEffect(() => {
