@@ -194,6 +194,15 @@ export default function FeudController() {
       setSponsorUploading(false);
     }
   };
+  const [sponsorUrl, setSponsorUrl] = useState("");
+  const applySponsorUrl = () => {
+    try {
+      setSponsorMediaUrl(sponsorUrl);
+      setSponsorUrl("");
+    } catch (e) {
+      alert(e instanceof SponsorMediaError ? e.message : "رابط غير صالح");
+    }
+  };
   const clearSponsor = async () => {
     await clearSponsorMedia(state.sponsorMediaExt);
   };
