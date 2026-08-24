@@ -25,7 +25,12 @@ import {
   TeamPhotoError,
 } from "@/lib/team-photo-upload";
 import TeamPhotoCropper from "@/components/TeamPhotoCropper";
-import { uploadSponsorMedia, clearSponsorMedia, SponsorMediaError } from "@/lib/sponsor-media";
+import {
+  uploadSponsorMedia,
+  clearSponsorMedia,
+  setSponsorMediaUrl,
+  SponsorMediaError,
+} from "@/lib/sponsor-media";
 
 type Track = {
   id: string;
