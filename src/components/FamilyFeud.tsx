@@ -410,9 +410,8 @@ export default function FamilyFeud() {
         await idbDeleteTrack(target.id.replace(/^local-/, ""));
         URL.revokeObjectURL(target.url);
       } else if (target.source === "storage" && target.storagePath) {
-        await withSession((auth) =>
-          deleteMusicFn({ data: { ...auth, path: target.storagePath } }),
-        );
+        const path = target.storagePath;
+        await withSession((auth) => deleteMusicFn({ data: { ...auth, path } }));
       }
     } catch (e) {
       console.error("Failed to delete track", e);
