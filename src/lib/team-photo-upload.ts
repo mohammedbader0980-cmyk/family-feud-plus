@@ -1,5 +1,5 @@
 import { createPhotoUploadFn, deletePhotoFn, signPhotoFn } from "@/lib/feud-api.functions";
-import { sessionAuth } from "@/lib/feud-session";
+import { sessionAuth, withSession } from "@/lib/feud-session";
 import { sendMessage } from "@/lib/feud-sync";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -39,7 +39,7 @@ export const cropToSquareJpeg = (file: File): Promise<Blob> =>
 /** Signed URL for a team's photo, or null when there is none. */
 export async function signTeamPhotoUrl(team: 1 | 2): Promise<string | null> {
   try {
-    const { url } = await signPhotoFn({ data: { ...sessionAuth(), team } });
+    const { url } = await withSession((auth) => signPhotoFn({ data: { ...auth, team } }));
     return url ?? null;
   } catch {
     return null;
@@ -47,9 +47,9 @@ export async function signTeamPhotoUrl(team: 1 | 2): Promise<string | null> {
 }
 
 async function putTeamPhoto(team: 1 | 2, blob: Blob): Promise<string> {
-  const upload = await createPhotoUploadFn({ data: { ...sessionAuth(), team } }).catch(
-    () => null,
-  );
+  const upload = await withSession((auth) =>
+    createPhotoUploadFn({ data: { ...auth, team } }),
+  ).catch(() => null);
   if (!upload) throw new TeamPhotoError("تعذّر تجهيز الرفع");
   const { error } = await supabase.storage
     .from(PHOTO_BUCKET)
@@ -84,6 +84,6 @@ export async function uploadTeamPhotoBlob(team: 1 | 2, blob: Blob): Promise<stri
 }
 
 export async function deleteTeamPhoto(team: 1 | 2): Promise<void> {
-  await deletePhotoFn({ data: { ...sessionAuth(), team } }).catch(() => null);
+  await withSession((auth) => deletePhotoFn({ data: { ...auth, team } })).catch(() => null);
   sendMessage({ action: "SET_TEAM_PHOTO", payload: { team, url: null } });
 }
