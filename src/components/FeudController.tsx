@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { sendMessage, subscribe, type DisplayState, type SyncMessage } from "@/lib/feud-sync";
-import { getSessionId, loadSessionState, sessionAuth } from "@/lib/feud-session";
+import { getSessionId, loadSessionState, withSession } from "@/lib/feud-session";
 import { createMusicUploadFn } from "@/lib/feud-api.functions";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -102,9 +102,9 @@ export default function FeudController() {
     try {
       for (const f of Array.from(files)) {
         try {
-          const upload = await createMusicUploadFn({
-            data: { ...sessionAuth(), fileName: f.name },
-          });
+          const upload = await withSession((auth) =>
+            createMusicUploadFn({ data: { ...auth, fileName: f.name } }),
+          );
           const { error } = await supabase.storage
             .from(MUSIC_BUCKET)
             .uploadToSignedUrl(upload.path, upload.token, f, {

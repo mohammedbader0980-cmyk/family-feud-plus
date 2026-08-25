@@ -3,7 +3,7 @@
 // panel or the mobile controller. Mirrors src/lib/team-photo-upload.ts.
 
 import { createSponsorUploadFn, signSponsorFn, deleteSponsorFn } from "@/lib/feud-api.functions";
-import { sessionAuth } from "@/lib/feud-session";
+import { sessionAuth, withSession } from "@/lib/feud-session";
 import { sendMessage } from "@/lib/feud-sync";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -66,7 +66,9 @@ export async function uploadSponsorMedia(file: File): Promise<SponsorMediaResult
 
   let upload: { path: string; token: string } | null = null;
   try {
-    upload = await createSponsorUploadFn({ data: { ...sessionAuth(), ext: meta.ext } });
+    upload = await withSession((auth) =>
+      createSponsorUploadFn({ data: { ...auth, ext: meta.ext } }),
+    );
   } catch (e) {
     throw new SponsorMediaError(
       "تعذّر تجهيز الرفع: " + (e instanceof Error ? e.message : "خطأ غير معروف"),
@@ -93,7 +95,9 @@ export async function uploadSponsorMedia(file: File): Promise<SponsorMediaResult
     throw new SponsorMediaError(msg);
   }
 
-  const signed = await signSponsorFn({ data: { ...sessionAuth(), ext: meta.ext } });
+  const signed = await withSession((auth) =>
+    signSponsorFn({ data: { ...auth, ext: meta.ext } }),
+  );
   if (!signed?.url) throw new SponsorMediaError("تعذّر توليد رابط الملف");
   const url = `${signed.url}&v=${Date.now()}`;
 
@@ -125,9 +129,9 @@ export function setSponsorMediaUrl(rawUrl: string): SponsorMediaResult {
 
 export async function clearSponsorMedia(ext: string | null): Promise<void> {
   if (ext) {
-    await deleteSponsorFn({
-      data: { ...sessionAuth(), ext: ext as SponsorExt },
-    }).catch(() => null);
+    await withSession((auth) =>
+      deleteSponsorFn({ data: { ...auth, ext: ext as SponsorExt } }),
+    ).catch(() => null);
   }
   sendMessage({ action: "SET_SPONSOR_MEDIA", payload: { kind: null, url: null, ext: null } });
 }

@@ -163,3 +163,18 @@ export const subscribe = (handler: Listener): (() => void) => {
   };
 };
  
+
+/** Tear down the realtime channel so the next send/subscribe rejoins the
+ *  (possibly new) session room. Used after a session id rotation. */
+export const resetChannel = () => {
+  if (channel) {
+    try {
+      supabase.removeChannel(channel);
+    } catch {
+      /* ignore */
+    }
+  }
+  channel = null;
+  channelReady = false;
+  if (listeners.size > 0) ensureChannel();
+};

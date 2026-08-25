@@ -92,6 +92,55 @@ export const sessionAuth = () => ({
   token: getSessionToken(),
 });
 
+/** True when this device is following a session from the URL (a controller). */
+const sessionFromUrl = (): boolean => {
+  if (typeof window === "undefined") return false;
+  return !!new URLSearchParams(window.location.search).get("session");
+};
+
+/**
+ * Start a brand new session on this device. Used to self-heal when the stored
+ * token no longer matches the session row (e.g. the row was created by another
+ * device or the local token was cleared) — the old id would otherwise reject
+ * every upload with "invalid session token".
+ */
+export const rotateSession = (): string => {
+  if (typeof window === "undefined") return "default";
+  const id = makeId();
+  const token = makeToken();
+  try {
+    window.localStorage.setItem(STORAGE_KEY, id);
+    window.localStorage.setItem(`${TOKEN_KEY}:${id}`, token);
+  } catch {
+    /* ignore */
+  }
+  cached = id;
+  cachedToken = token;
+  return id;
+};
+
+const isTokenError = (e: unknown) =>
+  /invalid session token/i.test(e instanceof Error ? e.message : String(e ?? ""));
+
+/**
+ * Run a call that needs session credentials, rotating to a fresh session and
+ * retrying once when the server rejects the stored token.
+ */
+export const withSession = async <T>(
+  run: (auth: { sessionId: string; token: string }) => Promise<T>,
+): Promise<T> => {
+  try {
+    return await run(sessionAuth());
+  } catch (e) {
+    if (!isTokenError(e) || sessionFromUrl()) throw e;
+    rotateSession();
+    const { resetChannel } = await import("@/lib/feud-sync");
+    resetChannel();
+    return run(sessionAuth());
+  }
+};
+
+
 export type SessionState = DisplayState["payload"];
 
 let saveTimer: number | null = null;
@@ -107,7 +156,9 @@ export const saveSessionState = (state: SessionState) => {
     const body = pending;
     pending = null;
     if (!body) return;
-    void saveSessionFn({ data: { ...sessionAuth(), stateJson: JSON.stringify(body) } }).catch((e) =>
+    void withSession((auth) =>
+      saveSessionFn({ data: { ...auth, stateJson: JSON.stringify(body) } }),
+    ).catch((e) =>
       console.warn("[feud-session] save failed", e),
     );
   }, 600);
@@ -116,7 +167,7 @@ export const saveSessionState = (state: SessionState) => {
 /** Last saved snapshot for this session, or null when none exists yet. */
 export const loadSessionState = async (): Promise<SessionState | null> => {
   try {
-    const res = await loadSessionFn({ data: sessionAuth() });
+    const res = await withSession((auth) => loadSessionFn({ data: auth }));
     const state = res?.stateJson ? (JSON.parse(res.stateJson) as SessionState) : undefined;
     if (!state || typeof state !== "object" || !("team1Score" in state)) return null;
     return state;

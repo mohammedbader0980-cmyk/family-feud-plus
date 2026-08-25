@@ -17,7 +17,13 @@ import {
 } from "@/lib/music-db";
 import { sendMessage, subscribe, type SyncMessage } from "@/lib/feud-sync";
 import { Typewriter, CountUp, Confetti } from "@/components/feud-fx";
-import { getSessionId, getSessionToken, saveSessionState, sessionAuth } from "@/lib/feud-session";
+import {
+  getSessionId,
+  getSessionToken,
+  saveSessionState,
+  sessionAuth,
+  withSession,
+} from "@/lib/feud-session";
 import { deleteMusicFn, listMusicFn } from "@/lib/feud-api.functions";
 import { signTeamPhotoUrl } from "@/lib/team-photo-upload";
 import {
@@ -44,7 +50,7 @@ const signTeamPhoto = (team: 1 | 2): Promise<string | null> => signTeamPhotoUrl(
 
 const loadStorageTracks = async (): Promise<Track[]> => {
   try {
-    const { tracks } = await listMusicFn({ data: sessionAuth() });
+    const { tracks } = await withSession((auth) => listMusicFn({ data: auth }));
     return tracks.map((t) => ({
       id: `storage-${t.path}`,
       name: t.name,
@@ -404,7 +410,8 @@ export default function FamilyFeud() {
         await idbDeleteTrack(target.id.replace(/^local-/, ""));
         URL.revokeObjectURL(target.url);
       } else if (target.source === "storage" && target.storagePath) {
-        await deleteMusicFn({ data: { ...sessionAuth(), path: target.storagePath } });
+        const path = target.storagePath;
+        await withSession((auth) => deleteMusicFn({ data: { ...auth, path } }));
       }
     } catch (e) {
       console.error("Failed to delete track", e);
