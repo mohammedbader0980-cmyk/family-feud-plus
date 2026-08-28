@@ -44,6 +44,8 @@ const defaultState: State = {
   sponsorMediaUrl: null,
   sponsorMediaExt: null,
   sponsorVisible: false,
+  buzzArmed: true,
+  buzzWinner: null,
 };
 
 const btnBase =
@@ -415,6 +417,24 @@ export default function FeudController() {
             className={`${btnBase} ${colors.gold}`}
           >
             فوز {state.team2Name}
+          </button>
+        </div>
+
+        {/* Buzzer */}
+        <div className="rounded-xl border-2 border-amber-700 bg-black/40 p-3">
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <span className="text-amber-400 font-bold text-sm">🔔 الجرس التنافسي</span>
+            <span className="text-white font-bold text-sm">
+              {state.buzzWinner
+                ? `سبق: ${state.buzzWinner === 1 ? state.team1Name : state.team2Name}`
+                : "لا أحد ضغط بعد"}
+            </span>
+          </div>
+          <button
+            onClick={() => send({ action: "RESET_BUZZER" })}
+            className={`${btnBase} ${colors.gold} w-full`}
+          >
+            🔔 إعادة تهيئة الجرس
           </button>
         </div>
 
