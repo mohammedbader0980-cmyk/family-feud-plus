@@ -40,7 +40,10 @@ export type ControllerAction =
       payload: { kind: "image" | "video" | null; url: string | null; ext: string | null };
     }
   | { action: "SHOW_SPONSOR" }
-  | { action: "HIDE_SPONSOR" };
+  | { action: "HIDE_SPONSOR" }
+  // Competitive buzzer (lockout)
+  | { action: "BUZZ"; payload: { team: 1 | 2 } }
+  | { action: "RESET_BUZZER" };
  
 export type DisplayState = {
   action: "STATE";
@@ -73,6 +76,8 @@ export type DisplayState = {
     sponsorMediaUrl: string | null;
     sponsorMediaExt: string | null;
     sponsorVisible: boolean;
+    buzzArmed: boolean;
+    buzzWinner: 1 | 2 | null;
   };
 };
  
