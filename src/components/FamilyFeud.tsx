@@ -515,7 +515,29 @@ export default function FamilyFeud() {
     setRoundPoints(0);
     setStrikes(0);
   };
+  // ===== Competitive buzzer (lockout) =====
+  const [buzzArmed, setBuzzArmed] = useState(true);
+  const [buzzWinner, setBuzzWinner] = useState<1 | 2 | null>(null);
+  const buzzLockRef = useRef<{ armed: boolean; winner: 1 | 2 | null }>({
+    armed: true,
+    winner: null,
+  });
+  const resetBuzzer = () => {
+    buzzLockRef.current = { armed: true, winner: null };
+    setBuzzArmed(true);
+    setBuzzWinner(null);
+  };
+  const handleBuzz = (team: 1 | 2) => {
+    const lock = buzzLockRef.current;
+    if (!lock.armed || lock.winner !== null) return;
+    buzzLockRef.current = { armed: false, winner: team };
+    setBuzzWinner(team);
+    setBuzzArmed(false);
+    playDing();
+  };
+
   const resetRound = () => {
+    resetBuzzer();
     setRevealed(Array(8).fill(false));
     setRoundPoints(0);
     setStrikes(0);
@@ -537,6 +559,7 @@ export default function FamilyFeud() {
     }
   };
   const startGame = () => {
+    resetBuzzer();
     setCurrentQIndex(0);
     setRevealed(Array(8).fill(false));
     setTeam1Score(0);
@@ -621,6 +644,13 @@ export default function FamilyFeud() {
     };
   });
 
+  const handleBuzzRef = useRef(handleBuzz);
+  const resetBuzzerRef = useRef(resetBuzzer);
+  useEffect(() => {
+    handleBuzzRef.current = handleBuzz;
+    resetBuzzerRef.current = resetBuzzer;
+  });
+
   // Build snapshot once for both broadcast points
   const buildSnapshot = (): import("@/lib/feud-sync").DisplayState["payload"] => {
     const answers = currentQ.answers || [];
@@ -656,6 +686,8 @@ export default function FamilyFeud() {
       sponsorMediaUrl,
       sponsorMediaExt,
       sponsorVisible,
+      buzzArmed,
+      buzzWinner,
     };
   };
 
@@ -691,6 +723,8 @@ export default function FamilyFeud() {
     sponsorMediaUrl,
     sponsorMediaExt,
     sponsorVisible,
+    buzzArmed,
+    buzzWinner,
   ]);
 
   // Subscribe to controller actions
@@ -816,6 +850,12 @@ export default function FamilyFeud() {
           break;
         case "HIDE_SPONSOR":
           setSponsorVisible(false);
+          break;
+        case "BUZZ":
+          handleBuzzRef.current(msg.payload.team);
+          break;
+        case "RESET_BUZZER":
+          resetBuzzerRef.current();
           break;
       }
     });
