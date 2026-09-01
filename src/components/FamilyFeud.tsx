@@ -515,7 +515,29 @@ export default function FamilyFeud() {
     setRoundPoints(0);
     setStrikes(0);
   };
+  // ===== Competitive buzzer (lockout) =====
+  const [buzzArmed, setBuzzArmed] = useState(true);
+  const [buzzWinner, setBuzzWinner] = useState<1 | 2 | null>(null);
+  const buzzLockRef = useRef<{ armed: boolean; winner: 1 | 2 | null }>({
+    armed: true,
+    winner: null,
+  });
+  const resetBuzzer = () => {
+    buzzLockRef.current = { armed: true, winner: null };
+    setBuzzArmed(true);
+    setBuzzWinner(null);
+  };
+  const handleBuzz = (team: 1 | 2) => {
+    const lock = buzzLockRef.current;
+    if (!lock.armed || lock.winner !== null) return;
+    buzzLockRef.current = { armed: false, winner: team };
+    setBuzzWinner(team);
+    setBuzzArmed(false);
+    playDing();
+  };
+
   const resetRound = () => {
+    resetBuzzer();
     setRevealed(Array(8).fill(false));
     setRoundPoints(0);
     setStrikes(0);
@@ -537,6 +559,7 @@ export default function FamilyFeud() {
     }
   };
   const startGame = () => {
+    resetBuzzer();
     setCurrentQIndex(0);
     setRevealed(Array(8).fill(false));
     setTeam1Score(0);
@@ -551,6 +574,7 @@ export default function FamilyFeud() {
 
   // ============ Mobile controller sync (BroadcastChannel) ============
   const [showQR, setShowQR] = useState(false);
+  const [buzzQR, setBuzzQR] = useState<1 | 2 | null>(null);
   const [displayMode, setDisplayMode] = useState(false);
 
   // Keep latest handlers in a ref so the subscription stays stable.
@@ -621,6 +645,13 @@ export default function FamilyFeud() {
     };
   });
 
+  const handleBuzzRef = useRef(handleBuzz);
+  const resetBuzzerRef = useRef(resetBuzzer);
+  useEffect(() => {
+    handleBuzzRef.current = handleBuzz;
+    resetBuzzerRef.current = resetBuzzer;
+  });
+
   // Build snapshot once for both broadcast points
   const buildSnapshot = (): import("@/lib/feud-sync").DisplayState["payload"] => {
     const answers = currentQ.answers || [];
@@ -656,6 +687,8 @@ export default function FamilyFeud() {
       sponsorMediaUrl,
       sponsorMediaExt,
       sponsorVisible,
+      buzzArmed,
+      buzzWinner,
     };
   };
 
@@ -691,6 +724,8 @@ export default function FamilyFeud() {
     sponsorMediaUrl,
     sponsorMediaExt,
     sponsorVisible,
+    buzzArmed,
+    buzzWinner,
   ]);
 
   // Subscribe to controller actions
@@ -817,6 +852,12 @@ export default function FamilyFeud() {
         case "HIDE_SPONSOR":
           setSponsorVisible(false);
           break;
+        case "BUZZ":
+          handleBuzzRef.current(msg.payload.team);
+          break;
+        case "RESET_BUZZER":
+          resetBuzzerRef.current();
+          break;
       }
     });
     return off;
@@ -942,12 +983,35 @@ export default function FamilyFeud() {
             </p>
           </div>
         </div>
-        <button
-          onClick={startGame}
-          className="w-full max-w-xs py-3 bg-black text-white rounded-full font-bold text-xl border-2 border-[#1f1f1f] hover:bg-gray-800 transition-colors shadow-2xl mb-4"
-        >
-          ابدأ اللعبة
-        </button>
+        <div className="flex items-center justify-center gap-3 flex-wrap mb-4 w-full">
+          <button
+            onClick={() => setBuzzQR(1)}
+            className="py-3 px-5 rounded-full font-bold text-base bg-gradient-to-b from-[#3a6bdc] to-[#15347a] text-white border-2 border-[#dca34b] shadow-xl hover:brightness-110 press-fx"
+          >
+            🔔 جرس فريق 1
+          </button>
+          <button
+            onClick={startGame}
+            className="w-full max-w-xs py-3 bg-black text-white rounded-full font-bold text-xl border-2 border-[#1f1f1f] hover:bg-gray-800 transition-colors shadow-2xl"
+          >
+            ابدأ اللعبة
+          </button>
+          <button
+            onClick={() => setBuzzQR(2)}
+            className="py-3 px-5 rounded-full font-bold text-base bg-gradient-to-b from-[#d64a4a] to-[#7a1515] text-white border-2 border-[#dca34b] shadow-xl hover:brightness-110 press-fx"
+          >
+            🔔 جرس فريق 2
+          </button>
+        </div>
+        {buzzQR && (
+          <QRModal
+            onClose={() => setBuzzQR(null)}
+            path="/buzzer"
+            extraQuery={`&team=${buzzQR}`}
+            title={`جرس فريق ${buzzQR}`}
+            hint="امسح الرمز بجوال الفريق لفتح شاشة الجرس"
+          />
+        )}
         <button
           onClick={() => setScreen("host")}
           className="w-full max-w-xs py-2 bg-transparent text-gray-300 rounded-full font-bold text-sm border border-gray-500 hover:text-white hover:border-white transition-colors shadow-xl"
@@ -1451,6 +1515,17 @@ export default function FamilyFeud() {
         }}
       >
         <div className="board-outer bg-dots-board w-full max-w-[1200px] relative pt-16 pb-8 px-4 md:px-16 md:py-16 flex flex-col items-center justify-center z-10 mt-12 sm:mt-10 md:mt-0">
+          {buzzWinner && (
+            <div
+              className="absolute top-2 left-1/2 -translate-x-1/2 z-50 px-6 md:px-10 py-2 md:py-3 rounded-2xl border-4 border-[#dca34b] shadow-2xl animate-pop win-pulse"
+              style={{ background: buzzWinner === 1 ? "#1d4ed8" : "#b91c1c" }}
+            >
+              <span className="text-white font-black text-lg md:text-3xl whitespace-nowrap">
+                {(buzzWinner === 1 ? team1Name : team2Name)} سبق
+              </span>
+            </div>
+          )}
+
           {/* Top logo + round points */}
           <div className="absolute -top-12 md:-top-16 flex flex-col items-center z-40 w-full px-2">
             <div className="bg-gradient-to-b from-[#4774d6] to-[#1d4199] rounded-[100%] border-2 md:border-[3px] border-[#dca34b] shadow-xl flex flex-col items-center justify-center w-[min(70vw,17rem)] px-6 py-3 md:py-4">
@@ -1476,7 +1551,17 @@ export default function FamilyFeud() {
               winning={team1Score > team2Score}
               bumpKey={scoreBump.t1}
             />
-            <div className="side-score w-16 h-20 md:w-28 md:h-32 flex items-center justify-center mt-1">
+            <div
+              className={`side-score w-16 h-20 md:w-28 md:h-32 flex items-center justify-center mt-1 ${
+                buzzWinner === 1 ? "win-pulse" : ""
+              }`}
+              style={{
+                boxShadow:
+                  buzzWinner === 1
+                    ? "0 0 28px 8px #1d4ed8, inset 0 0 18px rgba(255,255,255,0.35)"
+                    : undefined,
+              }}
+            >
               <span className="text-white text-3xl md:text-5xl font-bold drop-shadow-md">
                 <CountUp value={team1Score} />
               </span>
@@ -1504,7 +1589,17 @@ export default function FamilyFeud() {
               winning={team2Score > team1Score}
               bumpKey={scoreBump.t2}
             />
-            <div className="side-score w-16 h-20 md:w-28 md:h-32 flex items-center justify-center mt-1">
+            <div
+              className={`side-score w-16 h-20 md:w-28 md:h-32 flex items-center justify-center mt-1 ${
+                buzzWinner === 2 ? "win-pulse" : ""
+              }`}
+              style={{
+                boxShadow:
+                  buzzWinner === 2
+                    ? "0 0 28px 8px #b91c1c, inset 0 0 18px rgba(255,255,255,0.35)"
+                    : undefined,
+              }}
+            >
               <span className="text-white text-3xl md:text-5xl font-bold drop-shadow-md">
                 <CountUp value={team2Score} />
               </span>
@@ -1773,17 +1868,30 @@ export default function FamilyFeud() {
   );
 }
 
-function QRModal({ onClose }: { onClose: () => void }) {
-  const [url, setUrl] = useState("/controller");
+function QRModal({
+  onClose,
+  path = "/controller",
+  title = "وحدة تحكم الجوال",
+  hint = "امسح الرمز بالجوال لفتح وحدة التحكم — بدون تسجيل دخول",
+  extraQuery = "",
+}: {
+  onClose: () => void;
+  path?: string;
+  title?: string;
+  hint?: string;
+  extraQuery?: string;
+}) {
+  const [url, setUrl] = useState(path);
   const [qrSrc, setQrSrc] = useState<string | null>(null);
   useEffect(() => {
-    const link = `${window.location.origin}/controller?session=${getSessionId()}&t=${encodeURIComponent(getSessionToken())}`;
+    const link = `${window.location.origin}${path}?session=${getSessionId()}&t=${encodeURIComponent(getSessionToken())}${extraQuery}`;
     setUrl(link);
     // Rendered locally so the private session key never leaves the device.
     void import("qrcode").then((QR) =>
       QR.toDataURL(link, { width: 260, margin: 1 }).then(setQrSrc).catch(() => {}),
     );
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [path, extraQuery]);
   const [copied, setCopied] = useState(false);
   const copy = async () => {
     try {
@@ -1804,10 +1912,8 @@ function QRModal({ onClose }: { onClose: () => void }) {
         className="bg-card border border-border rounded-2xl p-6 max-w-sm w-full shadow-2xl text-center"
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 className="text-xl font-bold mb-2 text-white">وحدة تحكم الجوال</h3>
-        <p className="text-xs text-gray-400 mb-4">
-          امسح الرمز بالجوال لفتح وحدة التحكم — بدون تسجيل دخول
-        </p>
+        <h3 className="text-xl font-bold mb-2 text-white">{title}</h3>
+        <p className="text-xs text-gray-400 mb-4">{hint}</p>
         <div className="bg-white p-3 rounded-xl inline-block mb-4">
           {qrSrc ? (
             <img src={qrSrc} alt="QR" width={220} height={220} />
