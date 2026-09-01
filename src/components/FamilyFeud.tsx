@@ -1553,8 +1553,14 @@ export default function FamilyFeud() {
             />
             <div
               className={`side-score w-16 h-20 md:w-28 md:h-32 flex items-center justify-center mt-1 ${
-                buzzWinner === 1 ? "buzz-glow-1" : ""
+                buzzWinner === 1 ? "win-pulse" : ""
               }`}
+              style={{
+                boxShadow:
+                  buzzWinner === 1
+                    ? "0 0 28px 8px #1d4ed8, inset 0 0 18px rgba(255,255,255,0.35)"
+                    : undefined,
+              }}
             >
               <span className="text-white text-3xl md:text-5xl font-bold drop-shadow-md">
                 <CountUp value={team1Score} />
@@ -1585,8 +1591,14 @@ export default function FamilyFeud() {
             />
             <div
               className={`side-score w-16 h-20 md:w-28 md:h-32 flex items-center justify-center mt-1 ${
-                buzzWinner === 2 ? "buzz-glow-2" : ""
+                buzzWinner === 2 ? "win-pulse" : ""
               }`}
+              style={{
+                boxShadow:
+                  buzzWinner === 2
+                    ? "0 0 28px 8px #b91c1c, inset 0 0 18px rgba(255,255,255,0.35)"
+                    : undefined,
+              }}
             >
               <span className="text-white text-3xl md:text-5xl font-bold drop-shadow-md">
                 <CountUp value={team2Score} />
