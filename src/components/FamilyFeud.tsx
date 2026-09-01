@@ -1515,6 +1515,17 @@ export default function FamilyFeud() {
         }}
       >
         <div className="board-outer bg-dots-board w-full max-w-[1200px] relative pt-16 pb-8 px-4 md:px-16 md:py-16 flex flex-col items-center justify-center z-10 mt-12 sm:mt-10 md:mt-0">
+          {buzzWinner && (
+            <div
+              className="absolute top-2 left-1/2 -translate-x-1/2 z-50 px-6 md:px-10 py-2 md:py-3 rounded-2xl border-4 border-[#dca34b] shadow-2xl animate-pop win-pulse"
+              style={{ background: buzzWinner === 1 ? "#1d4ed8" : "#b91c1c" }}
+            >
+              <span className="text-white font-black text-lg md:text-3xl whitespace-nowrap">
+                {(buzzWinner === 1 ? team1Name : team2Name)} سبق
+              </span>
+            </div>
+          )}
+
           {/* Top logo + round points */}
           <div className="absolute -top-12 md:-top-16 flex flex-col items-center z-40 w-full px-2">
             <div className="bg-gradient-to-b from-[#4774d6] to-[#1d4199] rounded-[100%] border-2 md:border-[3px] border-[#dca34b] shadow-xl flex flex-col items-center justify-center w-[min(70vw,17rem)] px-6 py-3 md:py-4">
@@ -1540,7 +1551,11 @@ export default function FamilyFeud() {
               winning={team1Score > team2Score}
               bumpKey={scoreBump.t1}
             />
-            <div className="side-score w-16 h-20 md:w-28 md:h-32 flex items-center justify-center mt-1">
+            <div
+              className={`side-score w-16 h-20 md:w-28 md:h-32 flex items-center justify-center mt-1 ${
+                buzzWinner === 1 ? "buzz-glow-1" : ""
+              }`}
+            >
               <span className="text-white text-3xl md:text-5xl font-bold drop-shadow-md">
                 <CountUp value={team1Score} />
               </span>
@@ -1568,7 +1583,11 @@ export default function FamilyFeud() {
               winning={team2Score > team1Score}
               bumpKey={scoreBump.t2}
             />
-            <div className="side-score w-16 h-20 md:w-28 md:h-32 flex items-center justify-center mt-1">
+            <div
+              className={`side-score w-16 h-20 md:w-28 md:h-32 flex items-center justify-center mt-1 ${
+                buzzWinner === 2 ? "buzz-glow-2" : ""
+              }`}
+            >
               <span className="text-white text-3xl md:text-5xl font-bold drop-shadow-md">
                 <CountUp value={team2Score} />
               </span>
