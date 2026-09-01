@@ -574,6 +574,7 @@ export default function FamilyFeud() {
 
   // ============ Mobile controller sync (BroadcastChannel) ============
   const [showQR, setShowQR] = useState(false);
+  const [buzzQR, setBuzzQR] = useState<1 | 2 | null>(null);
   const [displayMode, setDisplayMode] = useState(false);
 
   // Keep latest handlers in a ref so the subscription stays stable.
@@ -982,12 +983,35 @@ export default function FamilyFeud() {
             </p>
           </div>
         </div>
-        <button
-          onClick={startGame}
-          className="w-full max-w-xs py-3 bg-black text-white rounded-full font-bold text-xl border-2 border-[#1f1f1f] hover:bg-gray-800 transition-colors shadow-2xl mb-4"
-        >
-          ابدأ اللعبة
-        </button>
+        <div className="flex items-center justify-center gap-3 flex-wrap mb-4 w-full">
+          <button
+            onClick={() => setBuzzQR(1)}
+            className="py-3 px-5 rounded-full font-bold text-base bg-gradient-to-b from-[#3a6bdc] to-[#15347a] text-white border-2 border-[#dca34b] shadow-xl hover:brightness-110 press-fx"
+          >
+            🔔 جرس فريق 1
+          </button>
+          <button
+            onClick={startGame}
+            className="w-full max-w-xs py-3 bg-black text-white rounded-full font-bold text-xl border-2 border-[#1f1f1f] hover:bg-gray-800 transition-colors shadow-2xl"
+          >
+            ابدأ اللعبة
+          </button>
+          <button
+            onClick={() => setBuzzQR(2)}
+            className="py-3 px-5 rounded-full font-bold text-base bg-gradient-to-b from-[#d64a4a] to-[#7a1515] text-white border-2 border-[#dca34b] shadow-xl hover:brightness-110 press-fx"
+          >
+            🔔 جرس فريق 2
+          </button>
+        </div>
+        {buzzQR && (
+          <QRModal
+            onClose={() => setBuzzQR(null)}
+            path="/buzzer"
+            extraQuery={`&team=${buzzQR}`}
+            title={`جرس فريق ${buzzQR}`}
+            hint="امسح الرمز بجوال الفريق لفتح شاشة الجرس"
+          />
+        )}
         <button
           onClick={() => setScreen("host")}
           className="w-full max-w-xs py-2 bg-transparent text-gray-300 rounded-full font-bold text-sm border border-gray-500 hover:text-white hover:border-white transition-colors shadow-xl"
@@ -1813,17 +1837,30 @@ export default function FamilyFeud() {
   );
 }
 
-function QRModal({ onClose }: { onClose: () => void }) {
-  const [url, setUrl] = useState("/controller");
+function QRModal({
+  onClose,
+  path = "/controller",
+  title = "وحدة تحكم الجوال",
+  hint = "امسح الرمز بالجوال لفتح وحدة التحكم — بدون تسجيل دخول",
+  extraQuery = "",
+}: {
+  onClose: () => void;
+  path?: string;
+  title?: string;
+  hint?: string;
+  extraQuery?: string;
+}) {
+  const [url, setUrl] = useState(path);
   const [qrSrc, setQrSrc] = useState<string | null>(null);
   useEffect(() => {
-    const link = `${window.location.origin}/controller?session=${getSessionId()}&t=${encodeURIComponent(getSessionToken())}`;
+    const link = `${window.location.origin}${path}?session=${getSessionId()}&t=${encodeURIComponent(getSessionToken())}${extraQuery}`;
     setUrl(link);
     // Rendered locally so the private session key never leaves the device.
     void import("qrcode").then((QR) =>
       QR.toDataURL(link, { width: 260, margin: 1 }).then(setQrSrc).catch(() => {}),
     );
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [path, extraQuery]);
   const [copied, setCopied] = useState(false);
   const copy = async () => {
     try {
@@ -1844,10 +1881,8 @@ function QRModal({ onClose }: { onClose: () => void }) {
         className="bg-card border border-border rounded-2xl p-6 max-w-sm w-full shadow-2xl text-center"
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 className="text-xl font-bold mb-2 text-white">وحدة تحكم الجوال</h3>
-        <p className="text-xs text-gray-400 mb-4">
-          امسح الرمز بالجوال لفتح وحدة التحكم — بدون تسجيل دخول
-        </p>
+        <h3 className="text-xl font-bold mb-2 text-white">{title}</h3>
+        <p className="text-xs text-gray-400 mb-4">{hint}</p>
         <div className="bg-white p-3 rounded-xl inline-block mb-4">
           {qrSrc ? (
             <img src={qrSrc} alt="QR" width={220} height={220} />
